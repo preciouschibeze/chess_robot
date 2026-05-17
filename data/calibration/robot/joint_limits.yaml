@@ -1,31 +1,31 @@
 limits:
   shoulder_pan:
-    provisional_min: null
-    provisional_max: null
-    neutral: null
+    provisional_min: 789
+    provisional_max: 2956
+    neutral: 1012
     margin_ticks: 20
-    calibrated: false
+    calibrated: true
     notes: ""
   shoulder_lift:
-    provisional_min: null
-    provisional_max: null
-    neutral: null
+    provisional_min: 855
+    provisional_max: 3107
+    neutral: 915
     margin_ticks: 20
-    calibrated: false
+    calibrated: true
     notes: ""
   elbow_flex:
-    provisional_min: null
-    provisional_max: null
-    neutral: null
+    provisional_min: 975
+    provisional_max: 3084
+    neutral: 3083
     margin_ticks: 20
-    calibrated: false
+    calibrated: true
     notes: ""
   wrist_flex:
-    provisional_min: null
-    provisional_max: null
-    neutral: null
+    provisional_min: 950
+    provisional_max: 3043
+    neutral: 2921
     margin_ticks: 20
-    calibrated: false
+    calibrated: true
     notes: ""
   wrist_roll:
     provisional_min: 1061

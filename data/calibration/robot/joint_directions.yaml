@@ -1,20 +1,20 @@
 directions:
   shoulder_pan:
-    sign: null
-    positive_description: null
-    notes: ""
+    sign: 1
+    positive_description: "increasing ticks rotates the arm clockwise when viewed from above"
+    notes: "shoulder pan/base yaw joint"
   shoulder_lift:
-    sign: null
-    positive_description: null
-    notes: ""
+    sign: 1
+    positive_description: "increasing ticks raises the upper arm"
+    notes: "shoulder lift joint"
   elbow_flex:
-    sign: null
-    positive_description: null
-    notes: ""
+    sign: 1
+    positive_description: "increasing ticks bends the elbow inward"
+    notes: "Neutral is passive safe resting position; equals upper safe limit due to gravity/rest configuration."
   wrist_flex:
-    sign: null
-    positive_description: null
-    notes: ""
+    sign: 1
+    positive_description: "increasing ticks lowers the gripper tip when viewed from the side"
+    notes: "wrist pitch joint"
   wrist_roll:
     sign: 1
     positive_description: "increasing ticks rotates wrist clockwise when viewed from the gripper end"
