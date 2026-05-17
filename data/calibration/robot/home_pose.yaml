@@ -1,0 +1,22 @@
+created_at_utc: "2026-05-17T16:07:09Z"
+notes: ""
+source: "live_read"
+joints:
+  shoulder_pan:
+    id: 1
+    position: 1030
+  shoulder_lift:
+    id: 2
+    position: 855
+  elbow_flex:
+    id: 3
+    position: 3083
+  wrist_flex:
+    id: 4
+    position: 2909
+  wrist_roll:
+    id: 5
+    position: 2118
+  gripper:
+    id: 6
+    position: 1081
