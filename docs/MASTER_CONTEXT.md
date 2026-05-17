@@ -8,8 +8,6 @@ Use this file when starting a fresh ChatGPT chat or a Codex task for a specific 
 
 This file is not a strict implementation contract. It is a persistent architectural memory document.
 
-Do not modify docs/MASTER_CONTEXT.md unless the task explicitly asks for documentation updates.
-
 Not every module described here must be implemented immediately. Some sections define the current active scope. Other sections define future structure, module boundaries, safety rules, and design assumptions so the project does not drift over time.
 
 Primary purpose:

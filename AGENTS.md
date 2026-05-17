@@ -18,6 +18,8 @@ Before making changes, read:
 
 Treat `docs/MASTER_CONTEXT.md` as the main project memory.
 
+Do not modify docs/MASTER_CONTEXT.md unless the task explicitly asks for documentation updates.
+
 Treat Current Active Scope as higher priority than Future Architecture.
 
 If old reports, specifications, or documents mention ROS, MoveIt, CNN-based piece classification, or broader future plans, do not treat that as current implementation scope. The current repository direction is Python-only on Jetson Nano unless the user explicitly changes it.
