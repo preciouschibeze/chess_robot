@@ -5,18 +5,18 @@ joints:
     current_position: 3083
     id: 3
   gripper:
-    current_position: 1081
+    current_position: 1122
     id: 6
   shoulder_lift:
-    current_position: 855
+    current_position: 857
     id: 2
   shoulder_pan:
-    current_position: 1030
+    current_position: 1028
     id: 1
   wrist_flex:
-    current_position: 2909
+    current_position: 2913
     id: 4
   wrist_roll:
-    current_position: 2117
+    current_position: 2118
     id: 5
-snapshot_utc: '2026-05-17T15:54:30Z'
+snapshot_utc: '2026-05-17T16:48:59Z'

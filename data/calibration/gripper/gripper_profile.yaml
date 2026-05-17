@@ -1,0 +1,17 @@
+gripper:
+  direction_sign: -1
+  grasp_position: 1122
+  joint: gripper
+  limits:
+    max: 1293
+    min: 1033
+  neutral_position: 1138
+  notes:
+  - 'Asymmetric gripper: one moving jaw, one fixed jaw.'
+  - Grasp position is not full mechanical close.
+  - Open position must fit the largest chess piece.
+  - Grasp profile was calibrated using a rook.
+  open_position: 1250
+  pre_grasp_position: 1176
+  release_position: 1185
+  servo_id: 6
