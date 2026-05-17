@@ -1,0 +1,77 @@
+# Robot configuration for the Jetson Nano chess robot.
+# Keep measured hardware facts here. Do not add joint limits or calibration values until measured.
+
+robot:
+  profile: so101_follower
+
+servo_bus:
+  # Tools default to dry-run and use the mock backend unless explicitly overridden.
+  backend: mock
+  dry_run_default: true
+  log_path: data/logs/servo.log
+
+  scan:
+    default_start_id: 1
+    default_end_id: 253
+
+  # Real SO-101/Feetech backend.
+  # Verified adapter path on the Jetson Nano: 2026-05-17.
+  # The SO-101 follower arm uses Feetech STS3215 servos. The backend below uses
+  # read-only Feetech packets: Model_Number reads for discovery and
+  # Present_Position reads for position snapshots.
+  feetech:
+    port: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5AB0182700-if00
+    baudrate: 1000000
+    timeout_seconds: 0.1
+    sdk: scservo_sdk
+    protocol_version: 0
+    transport: raw_serial
+    position_address: 56
+    position_length: 2
+
+  # Dry-run/mock data. Leave positions empty unless explicitly simulating values.
+  mock:
+    servo_ids: []
+    positions: {}
+
+servo_discovery:
+  last_scan_utc: "2026-05-17T04:05:57Z"
+  backend: feetech
+  read_only: true
+  scanned_range: [1, 253]
+  found_ids: [1, 2, 3, 4, 5, 6]
+  current_raw_positions:
+    1: 929
+    2: 903
+    3: 3082
+    4: 2903
+    5: 2115
+    6: 1162
+
+# SO-101 follower naming and IDs match the LeRobot SO101Follower defaults.
+# These are ID-to-joint labels only; limits and calibration remain unmeasured.
+joints:
+  shoulder_pan:
+    servo_id: 1
+    model: sts3215
+    calibrated: false
+  shoulder_lift:
+    servo_id: 2
+    model: sts3215
+    calibrated: false
+  elbow_flex:
+    servo_id: 3
+    model: sts3215
+    calibrated: false
+  wrist_flex:
+    servo_id: 4
+    model: sts3215
+    calibrated: false
+  wrist_roll:
+    servo_id: 5
+    model: sts3215
+    calibrated: false
+  gripper:
+    servo_id: 6
+    model: sts3215
+    calibrated: false

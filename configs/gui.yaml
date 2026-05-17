@@ -1,0 +1,5 @@
+# Placeholder GUI configuration.
+# The GUI should show interpreted state and saved outputs, not a live camera stream.
+
+gui:
+  profile: null

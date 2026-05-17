@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment files
+.env
+.env.*
+
+# Logs
+*.log
+data/logs/*
+
+# Runtime/debug outputs
+data/snapshots/*
+data/debug/*
+data/gui/*
+data/tmp/*
+tmp/
+
+# Keep directory placeholders if used
+!data/logs/.gitkeep
+!data/snapshots/.gitkeep
+!data/debug/.gitkeep
+!data/gui/.gitkeep
+!data/tmp/.gitkeep
+
+# Large/generated arrays and model files
+*.npy
+*.pt
+*.pth
+*.onnx
+
+# Do NOT globally ignore .npz.
+# Camera calibration .npz files may be required by the Jetson runtime.
+data/tmp/*.npz
+data/debug/*.npz
+data/snapshots/*.npz
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

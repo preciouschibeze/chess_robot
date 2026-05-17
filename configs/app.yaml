@@ -1,0 +1,5 @@
+# Placeholder application configuration.
+# Do not add runtime assumptions until the first vertical slices exist.
+
+app:
+  profile: null

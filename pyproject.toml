@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chess-robot"
+version = "0.1.0"
+description = "Lightweight skeleton for a Jetson Nano chess-playing robot."
+requires-python = ">=3.8,<3.9"
+
+[tool.setuptools.packages.find]
+include = ["chess_robot*"]

@@ -1,0 +1,1 @@
+"""Manual ambiguity confirmation placeholder."""

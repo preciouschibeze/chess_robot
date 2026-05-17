@@ -1,0 +1,5 @@
+# Placeholder vision configuration.
+# Do not add board dimensions, thresholds, or calibration values yet.
+
+vision:
+  profile: null

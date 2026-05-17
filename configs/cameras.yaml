@@ -1,0 +1,8 @@
+# Camera configuration for the fixed overhead camera path.
+# Wrist calibration data may live beside this file for future use, but board
+# detection must only use the overhead calibration profile.
+
+cameras:
+  overhead:
+    index: 0
+    calibration: data/calibration/cameras/overhead_calibration.npz
