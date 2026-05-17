@@ -1,0 +1,25 @@
+directions:
+  shoulder_pan:
+    sign: null
+    positive_description: null
+    notes: ""
+  shoulder_lift:
+    sign: null
+    positive_description: null
+    notes: ""
+  elbow_flex:
+    sign: null
+    positive_description: null
+    notes: ""
+  wrist_flex:
+    sign: null
+    positive_description: null
+    notes: ""
+  wrist_roll:
+    sign: 1
+    positive_description: "increasing ticks rotates wrist clockwise when viewed from the gripper end"
+    notes: "rotates the gripper"
+  gripper:
+    sign: -1
+    positive_description: "decreasing ticks closes the moving jaw against the fixed jaw"
+    notes: "asymmetric gripper; one jaw moves, one jaw is fixed"

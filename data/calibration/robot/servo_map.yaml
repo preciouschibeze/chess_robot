@@ -1,0 +1,24 @@
+aliases:
+  base_yaw: shoulder_pan
+  elbow_pitch: elbow_flex
+  shoulder_pitch: shoulder_lift
+  wrist_pitch: wrist_flex
+joints:
+  elbow_flex:
+    calibrated: false
+    id: 3
+  gripper:
+    calibrated: false
+    id: 6
+  shoulder_lift:
+    calibrated: false
+    id: 2
+  shoulder_pan:
+    calibrated: false
+    id: 1
+  wrist_flex:
+    calibrated: false
+    id: 4
+  wrist_roll:
+    calibrated: false
+    id: 5

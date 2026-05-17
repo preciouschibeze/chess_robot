@@ -45,6 +45,9 @@ class ServoBackend(object):
     def read_position(self, servo_id: int) -> Optional[int]:
         raise NotImplementedError
 
+    def torque_enable(self, servo_id: int, enabled: bool) -> None:
+        raise BackendUnavailable("Torque writes are unsupported by backend {!r}.".format(self.name))
+
     def close(self) -> None:
         pass
 
@@ -77,8 +80,9 @@ class FeetechServoBackend(ServoBackend):
     """SO-101/Feetech read-only backend.
 
     The preferred path uses scservo_sdk when it is installed. The Nano can also
-    use the built-in raw serial transport, which implements only Feetech read
-    packets for Model_Number and Present_Position. No write packets exist here.
+    use the built-in raw serial transport, which implements Feetech read
+    packets for Model_Number and Present_Position plus one verified SRAM write
+    for Torque_Enable only.
     """
 
     name = "feetech"
@@ -86,6 +90,11 @@ class FeetechServoBackend(ServoBackend):
     MODEL_NUMBER_ADDRESS = 3
     MODEL_NUMBER_LENGTH = 2
     READ_INSTRUCTION = 0x02
+    WRITE_INSTRUCTION = 0x03
+    # Verified from local LeRobot source on 2026-05-17:
+    # lerobot.motors.feetech.tables.STS_SMS_SERIES_CONTROL_TABLE["Torque_Enable"] == (40, 1)
+    TORQUE_ENABLE_ADDRESS = 40
+    TORQUE_ENABLE_LENGTH = 1
 
     def __init__(self, port: Optional[str], baudrate: Optional[int],
                  timeout_seconds: float = 0.1,
@@ -197,6 +206,22 @@ class FeetechServoBackend(ServoBackend):
             return int(value)
         return self._read_raw_register(servo_id, self._position_address, self._position_length)
 
+    def torque_enable(self, servo_id: int, enabled: bool) -> None:
+        servo_id = safety.validate_servo_id(servo_id)
+        value = 1 if enabled else 0
+        if self._transport == "scservo_sdk":
+            write_fn = getattr(self._packet_handler, "write1ByteTxRx", None)
+            if write_fn is None:
+                raise BackendUnavailable("Configured Feetech SDK has no write1ByteTxRx method.")
+            result = write_fn(self._port_handler, servo_id, self.TORQUE_ENABLE_ADDRESS, value)
+            comm, error = _normalize_packet_result(result, expected_values=2)
+            if comm != self._comm_success or error != self._no_error:
+                raise ServoBusError(
+                    "Torque write failed for servo {}: comm={}, error={}".format(servo_id, comm, error)
+                )
+            return
+        self._write_raw_register(servo_id, self.TORQUE_ENABLE_ADDRESS, [value])
+
     def _read_raw_register(self, servo_id: int, address: int, length: int) -> Optional[int]:
         packet = self._build_read_packet(servo_id, address, length)
         termios.tcflush(self._fd, termios.TCIOFLUSH)
@@ -210,8 +235,24 @@ class FeetechServoBackend(ServoBackend):
             value |= byte << (8 * shift)
         return value
 
+    def _write_raw_register(self, servo_id: int, address: int, values: List[int]) -> None:
+        packet = self._build_write_packet(servo_id, address, values)
+        termios.tcflush(self._fd, termios.TCIOFLUSH)
+        self._write_all(packet)
+        response = self._read_response(expected_length=6)
+        if response is None:
+            raise ServoBusError("No valid status response after torque write to servo {}.".format(servo_id))
+
     def _build_read_packet(self, servo_id: int, address: int, length: int) -> bytes:
         body = [servo_id, 4, self.READ_INSTRUCTION, address, length]
+        checksum = (~sum(body)) & 0xFF
+        return bytes([0xFF, 0xFF] + body + [checksum])
+
+    def _build_write_packet(self, servo_id: int, address: int, values: List[int]) -> bytes:
+        for value in values:
+            if int(value) < 0 or int(value) > 255:
+                raise ServoBusError("Feetech byte write value out of range: {!r}".format(value))
+        body = [servo_id, len(values) + 3, self.WRITE_INSTRUCTION, address] + [int(value) for value in values]
         checksum = (~sum(body)) & 0xFF
         return bytes([0xFF, 0xFF] + body + [checksum])
 
@@ -346,6 +387,41 @@ class ServoBus(object):
             position=position,
         )
         return position
+
+    def torque_enable(self, servo_id: int, enabled: bool) -> None:
+        servo_id = safety.validate_servo_id(servo_id)
+        if self.dry_run:
+            self.logger.log(
+                "servo_torque",
+                servo_id=servo_id,
+                backend=self.backend.name,
+                dry_run=True,
+                enabled=bool(enabled),
+                status="refused",
+                reason="dry_run",
+            )
+            raise ServoBusError("Real torque writes require --real and are refused in dry-run mode.")
+        try:
+            self.backend.torque_enable(servo_id, enabled)
+        except Exception as exc:
+            self.logger.log(
+                "servo_torque",
+                servo_id=servo_id,
+                backend=self.backend.name,
+                dry_run=self.dry_run,
+                enabled=bool(enabled),
+                status="error",
+                error=str(exc),
+            )
+            raise
+        self.logger.log(
+            "servo_torque",
+            servo_id=servo_id,
+            backend=self.backend.name,
+            dry_run=self.dry_run,
+            enabled=bool(enabled),
+            status="ok",
+        )
 
     def close(self) -> None:
         self.backend.close()

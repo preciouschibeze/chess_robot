@@ -1,0 +1,43 @@
+limits:
+  shoulder_pan:
+    provisional_min: null
+    provisional_max: null
+    neutral: null
+    margin_ticks: 20
+    calibrated: false
+    notes: ""
+  shoulder_lift:
+    provisional_min: null
+    provisional_max: null
+    neutral: null
+    margin_ticks: 20
+    calibrated: false
+    notes: ""
+  elbow_flex:
+    provisional_min: null
+    provisional_max: null
+    neutral: null
+    margin_ticks: 20
+    calibrated: false
+    notes: ""
+  wrist_flex:
+    provisional_min: null
+    provisional_max: null
+    neutral: null
+    margin_ticks: 20
+    calibrated: false
+    notes: ""
+  wrist_roll:
+    provisional_min: 1061
+    provisional_max: 3092
+    neutral: 2010
+    margin_ticks: 20
+    calibrated: true
+    notes: ""
+  gripper:
+    provisional_min: 1033
+    provisional_max: 1293
+    neutral: 1164
+    margin_ticks: 10
+    calibrated: true
+    notes: ""
