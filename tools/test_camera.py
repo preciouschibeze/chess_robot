@@ -11,7 +11,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from chess_robot.calibration.camera_profile import find_default_camera_profile, load_camera_profile
-from chess_robot.vision.camera import capture_frame, save_image
+from chess_robot.vision.camera import (
+    DEFAULT_CAMERA_CONFIG_PATH,
+    apply_overhead_camera_settings,
+    capture_frame,
+    get_camera_config,
+    is_overhead_camera,
+    save_image,
+)
 
 
 def setup_logging():
@@ -32,6 +39,24 @@ def build_parser():
     parser.add_argument("--camera-index", default="0", help="OpenCV camera index or device path. Default: 0")
     parser.add_argument("--calib", default=None, help="Optional calibration file path (.npz/.json/.yaml/.yml)")
     parser.add_argument("--output-dir", default="data/snapshots", help="Directory for latest_raw.png and latest_undistorted.png")
+    parser.add_argument(
+        "--camera-config",
+        default=str(DEFAULT_CAMERA_CONFIG_PATH),
+        help="Camera config YAML path. Default: {}".format(DEFAULT_CAMERA_CONFIG_PATH),
+    )
+    parser.add_argument(
+        "--apply-camera-settings",
+        dest="apply_camera_settings",
+        action="store_true",
+        default=None,
+        help="Apply configured overhead V4L2 controls before capture.",
+    )
+    parser.add_argument(
+        "--no-apply-camera-settings",
+        dest="apply_camera_settings",
+        action="store_false",
+        help="Do not apply configured overhead V4L2 controls before capture.",
+    )
     return parser
 
 
@@ -46,7 +71,21 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     camera_index = int(args.camera_index) if str(args.camera_index).isdigit() else args.camera_index
-    frame = capture_frame(camera_index)
+    camera_config = get_camera_config(config_path=args.camera_config)
+    overhead_capture = is_overhead_camera(camera_index, camera_config)
+    apply_settings = args.apply_camera_settings
+    if apply_settings is None:
+        apply_settings = overhead_capture
+
+    if apply_settings:
+        applied = apply_overhead_camera_settings(args.camera_config)
+        message = "Applied overhead camera settings: {}".format(", ".join(applied))
+        print(message)
+        log.info(message)
+
+    width = camera_config.get("width") if overhead_capture else None
+    height = camera_config.get("height") if overhead_capture else None
+    frame = capture_frame(camera_index, width=width, height=height)
     height, width = frame.shape[:2]
 
     raw_path = save_image(output_dir / "latest_raw.png", frame)
@@ -54,7 +93,12 @@ def main():
     print("Raw image: {}".format(raw_path))
     log.info("Saved raw camera frame to %s", raw_path)
 
-    calib_path = Path(args.calib) if args.calib else find_default_camera_profile(ROOT / "data" / "calibration" / "cameras")
+    if args.calib:
+        calib_path = Path(args.calib)
+    elif overhead_capture and camera_config.get("calibration_path"):
+        calib_path = Path(camera_config.get("calibration_path"))
+    else:
+        calib_path = find_default_camera_profile(ROOT / "data" / "calibration" / "cameras")
     if calib_path is None:
         message = "WARNING: no calibration file provided or found; saved raw frame only"
         print(message)
