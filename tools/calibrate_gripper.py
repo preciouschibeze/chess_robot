@@ -3,6 +3,13 @@
 
 This tool only reads the current gripper position when a backend is provided.
 It does not write goal positions, open/close the gripper, or move any servo.
+
+Calibration values such as min/max/neutral are loaded from YAML files, not
+hardcoded in this script. The only hardcoded values here are identity/safety
+invariants:
+- joint name: gripper
+- servo ID: 6
+- direction sign: -1
 """
 
 from __future__ import print_function
@@ -24,7 +31,6 @@ except ImportError:  # pragma: no cover - depends on runtime image
 from chess_robot.robot import safety
 from chess_robot.robot.servo_bus import (  # noqa: E402
     ServoBusError,
-    ServoEventLogger,
     build_servo_bus,
     load_robot_config,
 )
@@ -37,18 +43,7 @@ JOINT_DIRECTIONS_PATH = os.path.join(ROOT, "data", "calibration", "robot", "join
 
 GRIPPER_JOINT = "gripper"
 GRIPPER_SERVO_ID = 6
-GRIPPER_MIN = 1033
-GRIPPER_MAX = 1293
-GRIPPER_NEUTRAL = 1164
 GRIPPER_DIRECTION_SIGN = -1
-GRIPPER_POSITIVE_DESCRIPTION = (
-    "decreasing ticks closes the moving jaw against the fixed jaw"
-)
-GRIPPER_NOTES = [
-    "Asymmetric gripper: one moving jaw, one fixed jaw.",
-    "Grasp position is not full mechanical close.",
-    "Open position must fit the largest chess piece.",
-]
 
 POSITION_FIELDS = (
     "open_position",
@@ -57,6 +52,20 @@ POSITION_FIELDS = (
     "release_position",
     "neutral_position",
 )
+
+ORDERED_POSITION_FIELDS = (
+    "grasp_position",
+    "pre_grasp_position",
+    "neutral_position",
+    "release_position",
+    "open_position",
+)
+
+DEFAULT_NOTES = [
+    "Asymmetric gripper: one moving jaw, one fixed jaw.",
+    "Grasp position is not full mechanical close.",
+    "Open position must fit the largest chess piece.",
+]
 
 
 def _now_utc():
@@ -85,7 +94,7 @@ def _write_yaml(path, data):
     if directory:
         os.makedirs(directory, exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
-        yaml.safe_dump(data, handle, default_flow_style=False)
+        yaml.safe_dump(data, handle, default_flow_style=False, sort_keys=False)
 
 
 def _require_mapping(value, path, label):
@@ -109,54 +118,6 @@ def _optional_int(value, label):
     return _to_int(value, label)
 
 
-def _load_servo_map(path):
-    data = _read_yaml(path)
-    joints = _require_mapping(data.get("joints") or {}, path, "'joints'")
-    gripper_entry = _require_mapping(joints.get(GRIPPER_JOINT) or {}, path, "gripper joint")
-    servo_id = _to_int(gripper_entry.get("id"), "servo_map.yaml gripper id")
-    if servo_id != GRIPPER_SERVO_ID:
-        raise ServoBusError(
-            "servo_map.yaml gripper id must be {}.".format(GRIPPER_SERVO_ID)
-        )
-    return gripper_entry
-
-
-def _load_joint_limits(path):
-    data = _read_yaml(path)
-    limits = _require_mapping(data.get("limits") or {}, path, "'limits'")
-    gripper_entry = _require_mapping(limits.get(GRIPPER_JOINT) or {}, path, "gripper limits")
-    if not bool(gripper_entry.get("calibrated")):
-        raise ServoBusError("Gripper is not calibrated in joint_limits.yaml.")
-
-    min_value = _to_int(gripper_entry.get("provisional_min"), "joint_limits.yaml gripper provisional_min")
-    max_value = _to_int(gripper_entry.get("provisional_max"), "joint_limits.yaml gripper provisional_max")
-    neutral = _to_int(gripper_entry.get("neutral"), "joint_limits.yaml gripper neutral")
-    if min_value != GRIPPER_MIN or max_value != GRIPPER_MAX or neutral != GRIPPER_NEUTRAL:
-        raise ServoBusError(
-            "Gripper limits must remain at provisional_min={}, provisional_max={}, neutral={}.".format(
-                GRIPPER_MIN, GRIPPER_MAX, GRIPPER_NEUTRAL
-            )
-        )
-    return gripper_entry
-
-
-def _load_joint_directions(path):
-    data = _read_yaml(path)
-    directions = _require_mapping(data.get("directions") or {}, path, "'directions'")
-    gripper_entry = _require_mapping(directions.get(GRIPPER_JOINT) or {}, path, "gripper directions")
-    sign = _to_int(gripper_entry.get("sign"), "joint_directions.yaml gripper sign")
-    positive_description = str(gripper_entry.get("positive_description") or "").strip()
-    if sign != GRIPPER_DIRECTION_SIGN:
-        raise ServoBusError(
-            "Gripper direction sign must be {}.".format(GRIPPER_DIRECTION_SIGN)
-        )
-    if positive_description != GRIPPER_POSITIVE_DESCRIPTION:
-        raise ServoBusError(
-            "Gripper positive_description does not match the known calibration."
-        )
-    return gripper_entry
-
-
 def _normalize_notes(notes):
     if notes is None:
         return []
@@ -164,6 +125,7 @@ def _normalize_notes(notes):
         raw = notes
     else:
         raw = [notes]
+
     result = []
     for note in raw:
         text = str(note).strip()
@@ -172,12 +134,147 @@ def _normalize_notes(notes):
     return result
 
 
+def _load_servo_map(path):
+    data = _read_yaml(path)
+    joints = _require_mapping(data.get("joints") or {}, path, "'joints'")
+    gripper_entry = _require_mapping(joints.get(GRIPPER_JOINT) or {}, path, "gripper joint")
+
+    servo_id = _to_int(gripper_entry.get("id"), "servo_map.yaml gripper id")
+    if servo_id != GRIPPER_SERVO_ID:
+        raise ServoBusError(
+            "servo_map.yaml gripper id must be {}.".format(GRIPPER_SERVO_ID)
+        )
+
+    return gripper_entry
+
+
+def _load_joint_limits(path):
+    data = _read_yaml(path)
+    limits = _require_mapping(data.get("limits") or {}, path, "'limits'")
+    gripper_entry = _require_mapping(limits.get(GRIPPER_JOINT) or {}, path, "gripper limits")
+
+    if not bool(gripper_entry.get("calibrated")):
+        raise ServoBusError("Gripper is not calibrated in joint_limits.yaml.")
+
+    min_value = _to_int(
+        gripper_entry.get("provisional_min"),
+        "joint_limits.yaml gripper provisional_min",
+    )
+    max_value = _to_int(
+        gripper_entry.get("provisional_max"),
+        "joint_limits.yaml gripper provisional_max",
+    )
+    neutral = _to_int(
+        gripper_entry.get("neutral"),
+        "joint_limits.yaml gripper neutral",
+    )
+
+    if min_value >= max_value:
+        raise ServoBusError(
+            "Gripper provisional_min must be less than provisional_max."
+        )
+
+    if not (min_value <= neutral <= max_value):
+        raise ServoBusError(
+            "Gripper neutral={} must be inside [{}, {}].".format(
+                neutral,
+                min_value,
+                max_value,
+            )
+        )
+
+    return gripper_entry
+
+
+def _load_joint_directions(path):
+    data = _read_yaml(path)
+    directions = _require_mapping(data.get("directions") or {}, path, "'directions'")
+    gripper_entry = _require_mapping(
+        directions.get(GRIPPER_JOINT) or {},
+        path,
+        "gripper directions",
+    )
+
+    sign = _to_int(gripper_entry.get("sign"), "joint_directions.yaml gripper sign")
+    if sign != GRIPPER_DIRECTION_SIGN:
+        raise ServoBusError(
+            "Gripper direction sign must be {}.".format(GRIPPER_DIRECTION_SIGN)
+        )
+
+    return gripper_entry
+
+
+def _limit_values(limits_entry):
+    min_value = _to_int(
+        limits_entry.get("provisional_min"),
+        "joint_limits.yaml gripper provisional_min",
+    )
+    max_value = _to_int(
+        limits_entry.get("provisional_max"),
+        "joint_limits.yaml gripper provisional_max",
+    )
+    neutral = _to_int(
+        limits_entry.get("neutral"),
+        "joint_limits.yaml gripper neutral",
+    )
+    return min_value, max_value, neutral
+
+
+def _validate_position_inside_limits(field, value, min_value, max_value):
+    if value is None:
+        return
+    value = _to_int(value, "gripper profile {}".format(field))
+    if not (min_value <= value <= max_value):
+        raise ServoBusError(
+            "{}={} outside gripper limits [{}, {}].".format(
+                field,
+                value,
+                min_value,
+                max_value,
+            )
+        )
+
+
+def _validate_profile_order(profile):
+    values = {}
+    for field in ORDERED_POSITION_FIELDS:
+        value = profile.get(field)
+        if value is not None:
+            values[field] = _to_int(
+                value,
+                "gripper profile {}".format(field),
+            )
+
+    if len(values) != len(ORDERED_POSITION_FIELDS):
+        return
+
+    if not (
+        values["grasp_position"]
+        <= values["pre_grasp_position"]
+        <= values["neutral_position"]
+        <= values["release_position"]
+        <= values["open_position"]
+    ):
+        raise ServoBusError(
+            "Invalid gripper ordering. Expected: "
+            "grasp_position <= pre_grasp_position <= neutral_position "
+            "<= release_position <= open_position."
+        )
+
+
+def _validate_profile_limits(profile, min_value, max_value):
+    for field in POSITION_FIELDS:
+        _validate_position_inside_limits(field, profile.get(field), min_value, max_value)
+
+
 def _merge_gripper_profile(existing, servo_entry, limits_entry, directions_entry):
     profile = {}
     if isinstance(existing, dict):
         profile.update(existing)
 
-    profile["joint"] = profile.get("joint") or GRIPPER_JOINT
+    min_value, max_value, neutral = _limit_values(limits_entry)
+
+    profile["joint"] = GRIPPER_JOINT
     profile["servo_id"] = _optional_int(
         profile.get("servo_id") if profile.get("servo_id") is not None else servo_entry.get("id"),
         "gripper profile servo_id",
@@ -187,28 +284,48 @@ def _merge_gripper_profile(existing, servo_entry, limits_entry, directions_entry
         "gripper profile direction_sign",
     )
 
+    if profile["servo_id"] != GRIPPER_SERVO_ID:
+        raise ServoBusError(
+            "gripper_profile.yaml servo_id must be {}.".format(GRIPPER_SERVO_ID)
+        )
+
+    if profile["direction_sign"] != GRIPPER_DIRECTION_SIGN:
+        raise ServoBusError(
+            "gripper_profile.yaml direction_sign must be {}.".format(
+                GRIPPER_DIRECTION_SIGN
+            )
+        )
+
+    profile["calibration_status"] = profile.get(
+        "calibration_status",
+        "calibrated_after_lerobot_recalibration",
+    )
+
     merged_limits = {}
     if isinstance(profile.get("limits"), dict):
         merged_limits.update(profile["limits"])
-    merged_limits["min"] = _optional_int(
-        merged_limits.get("min") if merged_limits.get("min") is not None else limits_entry.get("provisional_min"),
-        "gripper profile limits.min",
-    )
-    merged_limits["max"] = _optional_int(
-        merged_limits.get("max") if merged_limits.get("max") is not None else limits_entry.get("provisional_max"),
-        "gripper profile limits.max",
-    )
+    merged_limits["min"] = min_value
+    merged_limits["max"] = max_value
     profile["limits"] = merged_limits
+
+    if profile.get("neutral_position") is None:
+        profile["neutral_position"] = neutral
 
     existing_notes = _normalize_notes(profile.get("notes"))
     merged_notes = []
-    for note in existing_notes + GRIPPER_NOTES:
+    for note in existing_notes + DEFAULT_NOTES:
         if note not in merged_notes:
             merged_notes.append(note)
     profile["notes"] = merged_notes
 
     for field in POSITION_FIELDS:
-        profile[field] = _optional_int(profile.get(field), "gripper profile {}".format(field))
+        profile[field] = _optional_int(
+            profile.get(field),
+            "gripper profile {}".format(field),
+        )
+
+    _validate_profile_limits(profile, min_value, max_value)
+    _validate_profile_order(profile)
 
     return profile
 
@@ -225,8 +342,10 @@ def _selected_record_field(args):
         selected.append("release_position")
     if args.record_neutral:
         selected.append("neutral_position")
+
     if len(selected) > 1:
         raise ServoBusError("Only one --record-* flag may be used at a time.")
+
     if selected:
         return selected[0]
     return None
@@ -274,7 +393,16 @@ def _build_parser():
     return parser
 
 
-def _save_profile(profile_root, current_position, record_field, bus_logger, backend_name, servo_entry, limits_entry, directions_entry):
+def _save_profile(
+    profile_root,
+    current_position,
+    record_field,
+    bus_logger,
+    backend_name,
+    servo_entry,
+    limits_entry,
+    directions_entry,
+):
     gripper_profile = profile_root.get(GRIPPER_JOINT)
     if not isinstance(gripper_profile, dict):
         gripper_profile = {}
@@ -285,7 +413,25 @@ def _save_profile(profile_root, current_position, record_field, bus_logger, back
         limits_entry,
         directions_entry,
     )
+
+    min_value, max_value, _neutral = _limit_values(limits_entry)
+    if not (min_value <= current_position <= max_value):
+        raise ServoBusError(
+            "Refusing to save: current gripper position {} is outside [{}, {}].".format(
+                current_position,
+                min_value,
+                max_value,
+            )
+        )
+
     merged_profile[record_field] = current_position
+    merged_profile["active_profile_valid"] = True
+    merged_profile["calibration_status"] = "calibrated_after_lerobot_recalibration"
+    merged_profile["calibrated_at_utc"] = _now_utc()
+
+    _validate_profile_limits(merged_profile, min_value, max_value)
+    _validate_profile_order(merged_profile)
+
     profile_root[GRIPPER_JOINT] = merged_profile
     _write_yaml(PROFILE_PATH, profile_root)
 
@@ -306,11 +452,44 @@ def _save_profile(profile_root, current_position, record_field, bus_logger, back
     print("Saved {}={} to {}.".format(record_field, current_position, PROFILE_PATH))
 
 
+def _print_profile_check(
+    servo_entry,
+    limits_entry,
+    directions_entry,
+    current_position,
+):
+    min_value, max_value, neutral = _limit_values(limits_entry)
+    in_range = None if current_position is None else min_value <= current_position <= max_value
+
+    print("Gripper profile check:")
+    print("  joint: {}".format(GRIPPER_JOINT))
+    print("  servo_id: {}".format(servo_entry.get("id")))
+    print("  direction_sign: {}".format(directions_entry.get("sign")))
+    print("  limits: [{}, {}]".format(min_value, max_value))
+    print("  neutral: {}".format(neutral))
+
+    positive_description = str(directions_entry.get("positive_description") or "").strip()
+    negative_description = str(directions_entry.get("negative_description") or "").strip()
+    if positive_description:
+        print("  positive_description: {}".format(positive_description))
+    if negative_description:
+        print("  negative_description: {}".format(negative_description))
+
+    if current_position is None:
+        print("  live_position: unavailable")
+    else:
+        print("  live_position: {}".format(current_position))
+        print("  live_position_in_range: {}".format("yes" if in_range else "no"))
+
+    return in_range
+
+
 def main():
     parser = _build_parser()
     args = parser.parse_args()
 
     record_field = _selected_record_field(args)
+
     config_path = args.config or os.path.join(ROOT, "configs", "robot.yaml")
     config = load_robot_config(config_path)
 
@@ -320,73 +499,84 @@ def main():
 
     current_position = None
     bus = None
-    if args.backend:
-        bus = build_servo_bus(config, config_path, dry_run=False, backend_name=args.backend)
-        try:
+
+    try:
+        if args.backend:
+            bus = build_servo_bus(
+                config,
+                config_path,
+                dry_run=False,
+                backend_name=args.backend,
+            )
             current_position = bus.read_position(GRIPPER_SERVO_ID)
-        except Exception:
-            bus.close()
-            raise
 
-    min_value = _to_int(limits_entry.get("provisional_min"), "joint_limits.yaml gripper provisional_min")
-    max_value = _to_int(limits_entry.get("provisional_max"), "joint_limits.yaml gripper provisional_max")
-    in_range = None if current_position is None else min_value <= current_position <= max_value
+        in_range = _print_profile_check(
+            servo_entry,
+            limits_entry,
+            directions_entry,
+            current_position,
+        )
 
-    print("Gripper profile check:")
-    print("  joint: {}".format(GRIPPER_JOINT))
-    print("  servo_id: {}".format(servo_entry.get("id")))
-    print("  direction_sign: {}".format(directions_entry.get("sign")))
-    print("  limits: [{}, {}]".format(min_value, max_value))
-    if current_position is None:
-        print("  live_position: unavailable")
-    else:
-        print("  live_position: {}".format(current_position))
-        print("  live_position_in_range: {}".format("yes" if in_range else "no"))
+        profile_root = _read_yaml(PROFILE_PATH)
 
-    profile_root = _read_yaml(PROFILE_PATH)
-    if record_field is None:
-        print("No profile changes made.")
-        if bus is not None:
-            bus.close()
-        if current_position is not None and not in_range:
+        if record_field is None:
+            merged_profile = _merge_gripper_profile(
+                profile_root.get(GRIPPER_JOINT) if isinstance(profile_root, dict) else {},
+                servo_entry,
+                limits_entry,
+                directions_entry,
+            )
+
+            print("  profile_active_valid: {}".format(
+                "yes" if bool(merged_profile.get("active_profile_valid")) else "no"
+            ))
+            print("No profile changes made.")
+
+            if current_position is not None and not in_range:
+                min_value, max_value, _neutral = _limit_values(limits_entry)
+                raise ServoBusError(
+                    "Current gripper position {} is outside [{}, {}].".format(
+                        current_position,
+                        min_value,
+                        max_value,
+                    )
+                )
+
+            return 0
+
+        if current_position is None:
             raise ServoBusError(
-                "Refusing to save: current gripper position {} is outside [{}, {}].".format(
-                    current_position, min_value, max_value
+                "Recording {} requires a backend that can read the live gripper position.".format(
+                    record_field
                 )
             )
+
+        if not in_range:
+            min_value, max_value, _neutral = _limit_values(limits_entry)
+            raise ServoBusError(
+                "Refusing to save: current gripper position {} is outside [{}, {}].".format(
+                    current_position,
+                    min_value,
+                    max_value,
+                )
+            )
+
+        _save_profile(
+            profile_root,
+            current_position,
+            record_field,
+            bus.logger if bus is not None else None,
+            args.backend,
+            servo_entry,
+            limits_entry,
+            directions_entry,
+        )
+
         return 0
 
-    if current_position is None:
+    finally:
         if bus is not None:
             bus.close()
-        raise ServoBusError(
-            "Recording {} requires a backend that can read the live gripper position.".format(
-                record_field
-            )
-        )
-
-    if not in_range:
-        if bus is not None:
-            bus.close()
-        raise ServoBusError(
-            "Refusing to save: current gripper position {} is outside [{}, {}].".format(
-                current_position, min_value, max_value
-            )
-        )
-
-    _save_profile(
-        profile_root,
-        current_position,
-        record_field,
-        bus.logger if bus is not None else None,
-        args.backend,
-        servo_entry,
-        limits_entry,
-        directions_entry,
-    )
-    if bus is not None:
-        bus.close()
-    return 0
 
 
 if __name__ == "__main__":
