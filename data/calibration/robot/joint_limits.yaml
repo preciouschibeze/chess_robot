@@ -1,43 +1,43 @@
 limits:
   shoulder_pan:
-    provisional_min: 789
-    provisional_max: 2956
-    neutral: 1012
+    provisional_min: 876
+    provisional_max: 3078
+    neutral: 1074
     margin_ticks: 20
     calibrated: true
-    notes: ""
+    notes: "Conservative software range after LeRobot recalibration; clamped to EEPROM min."
   shoulder_lift:
-    provisional_min: 855
-    provisional_max: 3107
-    neutral: 915
+    provisional_min: 857
+    provisional_max: 3232
+    neutral: 895
     margin_ticks: 20
     calibrated: true
-    notes: ""
+    notes: "Conservative software range after LeRobot recalibration; clamped to EEPROM min."
   elbow_flex:
-    provisional_min: 975
-    provisional_max: 3084
-    neutral: 3083
+    provisional_min: 923
+    provisional_max: 3040
+    neutral: 3030
     margin_ticks: 20
     calibrated: true
-    notes: ""
+    notes: "Conservative software range after LeRobot recalibration; clamped to EEPROM max."
   wrist_flex:
-    provisional_min: 950
-    provisional_max: 3043
-    neutral: 2921
+    provisional_min: 1145
+    provisional_max: 2935
+    neutral: 1905
     margin_ticks: 20
     calibrated: true
-    notes: ""
+    notes: "Conservative software range kept inside EEPROM limits."
   wrist_roll:
-    provisional_min: 1061
-    provisional_max: 3092
-    neutral: 2010
+    provisional_min: 379
+    provisional_max: 2350
+    neutral: 1093
     margin_ticks: 20
     calibrated: true
-    notes: ""
+    notes: "Conservative software range kept inside EEPROM limits."
   gripper:
-    provisional_min: 1033
-    provisional_max: 1293
-    neutral: 1164
+    provisional_min: 1463
+    provisional_max: 1738
+    neutral: 1616
     margin_ticks: 10
     calibrated: true
-    notes: ""
+    notes: "Conservative software range kept inside EEPROM limits."

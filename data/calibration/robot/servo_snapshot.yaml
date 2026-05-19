@@ -2,21 +2,21 @@ backend: feetech
 dry_run: false
 joints:
   elbow_flex:
-    current_position: 3083
+    current_position: 3035
     id: 3
   gripper:
-    current_position: 1122
+    current_position: 1602
     id: 6
   shoulder_lift:
-    current_position: 857
+    current_position: 894
     id: 2
   shoulder_pan:
-    current_position: 1028
+    current_position: 1074
     id: 1
   wrist_flex:
-    current_position: 2913
+    current_position: 2828
     id: 4
   wrist_roll:
-    current_position: 2118
+    current_position: 1091
     id: 5
-snapshot_utc: '2026-05-17T16:48:59Z'
+snapshot_utc: '2026-05-19T06:02:24Z'
