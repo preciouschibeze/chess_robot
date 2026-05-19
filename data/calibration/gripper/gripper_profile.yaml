@@ -1,17 +1,34 @@
 gripper:
-  direction_sign: -1
-  grasp_position: 1122
   joint: gripper
-  limits:
-    max: 1293
-    min: 1033
-  neutral_position: 1138
-  notes:
-  - 'Asymmetric gripper: one moving jaw, one fixed jaw.'
-  - Grasp position is not full mechanical close.
-  - Open position must fit the largest chess piece.
-  - Grasp profile was calibrated using a rook.
-  open_position: 1250
-  pre_grasp_position: 1176
-  release_position: 1185
   servo_id: 6
+  calibration_status: calibrated_after_lerobot_recalibration
+  active_profile_valid: true
+
+  limits:
+    min: 1463
+    max: 1738
+
+  eeprom_min_angle_limit: 1460
+  eeprom_max_angle_limit: 2880
+  observed_present_position_after_lerobot_recalibration: 1462
+  direction_sign: -1
+  movement_direction_note: "increasing ticks opens gripper; decreasing ticks closes gripper"
+
+  grasp_position: 1536
+  pre_grasp_position: 1596
+  neutral_position: 1616
+  release_position: 1652
+  open_position: 1704
+
+  previous_profile:
+    direction_sign: -1
+    open_position: 1250
+    pre_grasp_position: 1176
+    grasp_position: 1122
+    release_position: 1185
+    neutral_position: 1138
+
+  notes:
+    - "Previous 1033..1293 / 1122..1250 gripper values are stale after LeRobot recalibration."
+    - "Active profile was manually recorded after LeRobot recalibration."
+    - "Asymmetric gripper: one moving jaw, one fixed jaw."
