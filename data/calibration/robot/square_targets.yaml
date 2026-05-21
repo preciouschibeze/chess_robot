@@ -1,0 +1,1265 @@
+board_orientation: robot_black_side
+joint_order:
+- shoulder_pan
+- shoulder_lift
+- elbow_flex
+- wrist_flex
+- wrist_roll
+- gripper
+metadata:
+  created_by: robot_square_calibration
+  notes:
+  - above_pose only
+  - generated poses are joint-space interpolations and require manual validation
+pose_type: joint_ticks
+recommended_anchors:
+- a8
+- c8
+- f8
+- h8
+- a6
+- c6
+- f6
+- h6
+- a3
+- c3
+- f3
+- h3
+- a1
+- c1
+- f1
+- h1
+squares:
+  a1:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 1219
+        gripper: 1608
+        shoulder_lift: 2829
+        shoulder_pan: 2328
+        wrist_flex: 2870
+        wrist_roll: 1067
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:05:25Z'
+      source: manual
+  a2:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a1
+        - a3
+        - c1
+        - c3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1625
+        gripper: 1603
+        shoulder_lift: 2599
+        shoulder_pan: 2336
+        wrist_flex: 2721
+        wrist_roll: 1056
+      notes:
+      - requires manual validation before playback
+      source: generated
+  a3:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 1944
+        gripper: 1600
+        shoulder_lift: 2423
+        shoulder_pan: 2389
+        wrist_flex: 2607
+        wrist_roll: 1045
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:12:34Z'
+      source: manual
+  a4:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a3
+        - a6
+        - c3
+        - c6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2092
+        gripper: 1600
+        shoulder_lift: 2311
+        shoulder_pan: 2386
+        wrist_flex: 2580
+        wrist_roll: 1044
+      notes:
+      - requires manual validation before playback
+      source: generated
+  a5:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a6
+        - a3
+        - c6
+        - c3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2341
+        gripper: 1599
+        shoulder_lift: 2130
+        shoulder_pan: 2457
+        wrist_flex: 2537
+        wrist_roll: 1037
+      notes:
+      - requires manual validation before playback
+      source: generated
+  a6:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2426
+        gripper: 1597
+        shoulder_lift: 2078
+        shoulder_pan: 2528
+        wrist_flex: 2509
+        wrist_roll: 1017
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:14:00Z'
+      source: manual
+  a7:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a6
+        - a8
+        - c6
+        - c8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2550
+        gripper: 1601
+        shoulder_lift: 1955
+        shoulder_pan: 2590
+        wrist_flex: 2550
+        wrist_roll: 1072
+      notes:
+      - requires manual validation before playback
+      source: generated
+  a8:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2610
+        gripper: 1605
+        shoulder_lift: 1927
+        shoulder_pan: 2732
+        wrist_flex: 2556
+        wrist_roll: 1107
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:07:15Z'
+      source: manual
+  b1:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a1
+        - c1
+        - a3
+        - c3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1493
+        gripper: 1602
+        shoulder_lift: 2674
+        shoulder_pan: 2277
+        wrist_flex: 2770
+        wrist_roll: 1073
+      notes:
+      - requires manual validation before playback
+      source: generated
+  b2:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a1
+        - a3
+        - c1
+        - c3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1712
+        gripper: 1601
+        shoulder_lift: 2545
+        shoulder_pan: 2292
+        wrist_flex: 2688
+        wrist_roll: 1056
+      notes:
+      - requires manual validation before playback
+      source: generated
+  b3:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a3
+        - c3
+        - a1
+        - c1
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1931
+        gripper: 1600
+        shoulder_lift: 2416
+        shoulder_pan: 2306
+        wrist_flex: 2605
+        wrist_roll: 1040
+      notes:
+      - requires manual validation before playback
+      source: generated
+  b4:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a3
+        - c3
+        - a6
+        - c6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2167
+        gripper: 1600
+        shoulder_lift: 2252
+        shoulder_pan: 2345
+        wrist_flex: 2561
+        wrist_roll: 1044
+      notes:
+      - requires manual validation before playback
+      source: generated
+  b5:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a6
+        - c6
+        - a3
+        - c3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2356
+        gripper: 1601
+        shoulder_lift: 2103
+        shoulder_pan: 2393
+        wrist_flex: 2557
+        wrist_roll: 1063
+      notes:
+      - requires manual validation before playback
+      source: generated
+  b6:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a6
+        - c6
+        - a8
+        - c8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2526
+        gripper: 1602
+        shoulder_lift: 1955
+        shoulder_pan: 2453
+        wrist_flex: 2565
+        wrist_roll: 1081
+      notes:
+      - requires manual validation before playback
+      source: generated
+  b7:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a6
+        - a8
+        - c6
+        - c8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2614
+        gripper: 1602
+        shoulder_lift: 1859
+        shoulder_pan: 2509
+        wrist_flex: 2586
+        wrist_roll: 1091
+      notes:
+      - requires manual validation before playback
+      source: generated
+  b8:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - a8
+        - c8
+        - a6
+        - c6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2703
+        gripper: 1603
+        shoulder_lift: 1762
+        shoulder_pan: 2565
+        wrist_flex: 2607
+        wrist_roll: 1101
+      notes:
+      - requires manual validation before playback
+      source: generated
+  c1:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 1548
+        gripper: 1597
+        shoulder_lift: 2647
+        shoulder_pan: 2212
+        wrist_flex: 2753
+        wrist_roll: 1096
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:08:01Z'
+      source: manual
+  c2:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c1
+        - c3
+        - a1
+        - a3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1799
+        gripper: 1599
+        shoulder_lift: 2491
+        shoulder_pan: 2247
+        wrist_flex: 2653
+        wrist_roll: 1057
+      notes:
+      - requires manual validation before playback
+      source: generated
+  c3:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2138
+        gripper: 1599
+        shoulder_lift: 2281
+        shoulder_pan: 2237
+        wrist_flex: 2520
+        wrist_roll: 1018
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:14:53Z'
+      source: manual
+  c4:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c3
+        - c6
+        - a3
+        - a6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2200
+        gripper: 1600
+        shoulder_lift: 2227
+        shoulder_pan: 2293
+        wrist_flex: 2543
+        wrist_roll: 1040
+      notes:
+      - requires manual validation before playback
+      source: generated
+  c5:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c6
+        - c3
+        - a6
+        - a3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2413
+        gripper: 1604
+        shoulder_lift: 2043
+        shoulder_pan: 2340
+        wrist_flex: 2577
+        wrist_roll: 1094
+      notes:
+      - requires manual validation before playback
+      source: generated
+  c6:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2537
+        gripper: 1607
+        shoulder_lift: 1929
+        shoulder_pan: 2322
+        wrist_flex: 2601
+        wrist_roll: 1135
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:16:08Z'
+      source: manual
+  c7:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c6
+        - c8
+        - a6
+        - a8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2678
+        gripper: 1603
+        shoulder_lift: 1763
+        shoulder_pan: 2429
+        wrist_flex: 2622
+        wrist_roll: 1111
+      notes:
+      - requires manual validation before playback
+      source: generated
+  c8:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2884
+        gripper: 1601
+        shoulder_lift: 1501
+        shoulder_pan: 2455
+        wrist_flex: 2678
+        wrist_roll: 1106
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:10:14Z'
+      source: manual
+  d1:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c1
+        - f1
+        - c3
+        - f3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1667
+        gripper: 1598
+        shoulder_lift: 2577
+        shoulder_pan: 2163
+        wrist_flex: 2704
+        wrist_roll: 1076
+      notes:
+      - requires manual validation before playback
+      source: generated
+  d2:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c1
+        - c3
+        - f1
+        - f3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1840
+        gripper: 1599
+        shoulder_lift: 2472
+        shoulder_pan: 2157
+        wrist_flex: 2635
+        wrist_roll: 1053
+      notes:
+      - requires manual validation before playback
+      source: generated
+  d3:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c3
+        - f3
+        - c1
+        - f1
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2015
+        gripper: 1599
+        shoulder_lift: 2364
+        shoulder_pan: 2173
+        wrist_flex: 2566
+        wrist_roll: 1032
+      notes:
+      - requires manual validation before playback
+      source: generated
+  d4:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c3
+        - c6
+        - f3
+        - f6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2272
+        gripper: 1602
+        shoulder_lift: 2179
+        shoulder_pan: 2160
+        wrist_flex: 2533
+        wrist_roll: 1046
+      notes:
+      - requires manual validation before playback
+      source: generated
+  d5:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c6
+        - c3
+        - f6
+        - f3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2422
+        gripper: 1605
+        shoulder_lift: 2049
+        shoulder_pan: 2180
+        wrist_flex: 2557
+        wrist_roll: 1084
+      notes:
+      - requires manual validation before playback
+      source: generated
+  d6:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c6
+        - f6
+        - c8
+        - f8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2620
+        gripper: 1605
+        shoulder_lift: 1844
+        shoulder_pan: 2226
+        wrist_flex: 2599
+        wrist_roll: 1118
+      notes:
+      - requires manual validation before playback
+      source: generated
+  d7:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c6
+        - c8
+        - f6
+        - f8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2723
+        gripper: 1603
+        shoulder_lift: 1718
+        shoulder_pan: 2226
+        wrist_flex: 2621
+        wrist_roll: 1110
+      notes:
+      - requires manual validation before playback
+      source: generated
+  d8:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - c8
+        - f8
+        - c6
+        - f6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2822
+        gripper: 1602
+        shoulder_lift: 1591
+        shoulder_pan: 2281
+        wrist_flex: 2648
+        wrist_roll: 1106
+      notes:
+      - requires manual validation before playback
+      source: generated
+  e1:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f1
+        - c1
+        - f3
+        - c3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1657
+        gripper: 1601
+        shoulder_lift: 2588
+        shoulder_pan: 2053
+        wrist_flex: 2704
+        wrist_roll: 1065
+      notes:
+      - requires manual validation before playback
+      source: generated
+  e2:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f1
+        - f3
+        - c1
+        - c3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1837
+        gripper: 1600
+        shoulder_lift: 2483
+        shoulder_pan: 2056
+        wrist_flex: 2633
+        wrist_roll: 1048
+      notes:
+      - requires manual validation before playback
+      source: generated
+  e3:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f3
+        - c3
+        - f1
+        - c1
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2015
+        gripper: 1600
+        shoulder_lift: 2381
+        shoulder_pan: 2036
+        wrist_flex: 2562
+        wrist_roll: 1030
+      notes:
+      - requires manual validation before playback
+      source: generated
+  e4:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f3
+        - c3
+        - f6
+        - c6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2277
+        gripper: 1602
+        shoulder_lift: 2190
+        shoulder_pan: 2051
+        wrist_flex: 2523
+        wrist_roll: 1041
+      notes:
+      - requires manual validation before playback
+      source: generated
+  e5:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f6
+        - c6
+        - f3
+        - c3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2439
+        gripper: 1605
+        shoulder_lift: 2058
+        shoulder_pan: 2036
+        wrist_flex: 2530
+        wrist_roll: 1064
+      notes:
+      - requires manual validation before playback
+      source: generated
+  e6:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f6
+        - c6
+        - f8
+        - c8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2649
+        gripper: 1605
+        shoulder_lift: 1855
+        shoulder_pan: 1989
+        wrist_flex: 2555
+        wrist_roll: 1084
+      notes:
+      - requires manual validation before playback
+      source: generated
+  e7:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f6
+        - f8
+        - c6
+        - c8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2742
+        gripper: 1603
+        shoulder_lift: 1723
+        shoulder_pan: 1983
+        wrist_flex: 2592
+        wrist_roll: 1094
+      notes:
+      - requires manual validation before playback
+      source: generated
+  e8:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f8
+        - c8
+        - f6
+        - c6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2839
+        gripper: 1600
+        shoulder_lift: 1592
+        shoulder_pan: 1923
+        wrist_flex: 2624
+        wrist_roll: 1101
+      notes:
+      - requires manual validation before playback
+      source: generated
+  f1:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 1527
+        gripper: 1603
+        shoulder_lift: 2667
+        shoulder_pan: 2007
+        wrist_flex: 2753
+        wrist_roll: 1072
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:08:33Z'
+      source: manual
+  f2:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f1
+        - f3
+        - h1
+        - h3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1792
+        gripper: 1602
+        shoulder_lift: 2514
+        shoulder_pan: 1964
+        wrist_flex: 2650
+        wrist_roll: 1043
+      notes:
+      - requires manual validation before playback
+      source: generated
+  f3:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2141
+        gripper: 1600
+        shoulder_lift: 2315
+        shoulder_pan: 1970
+        wrist_flex: 2510
+        wrist_roll: 1017
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:15:26Z'
+      source: manual
+  f4:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f3
+        - f6
+        - h3
+        - h6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2219
+        gripper: 1603
+        shoulder_lift: 2245
+        shoulder_pan: 1914
+        wrist_flex: 2523
+        wrist_roll: 1024
+      notes:
+      - requires manual validation before playback
+      source: generated
+  f5:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f6
+        - f3
+        - h6
+        - h3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2459
+        gripper: 1606
+        shoulder_lift: 2055
+        shoulder_pan: 1872
+        wrist_flex: 2520
+        wrist_roll: 1047
+      notes:
+      - requires manual validation before playback
+      source: generated
+  f6:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2595
+        gripper: 1607
+        shoulder_lift: 1952
+        shoulder_pan: 1897
+        wrist_flex: 2512
+        wrist_roll: 1065
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:16:43Z'
+      source: manual
+  f7:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f6
+        - f8
+        - h6
+        - h8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2727
+        gripper: 1603
+        shoulder_lift: 1759
+        shoulder_pan: 1778
+        wrist_flex: 2564
+        wrist_roll: 1076
+      notes:
+      - requires manual validation before playback
+      source: generated
+  f8:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2914
+        gripper: 1597
+        shoulder_lift: 1500
+        shoulder_pan: 1745
+        wrist_flex: 2635
+        wrist_roll: 1103
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:11:14Z'
+      source: manual
+  g1:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f1
+        - h1
+        - f3
+        - h3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1472
+        gripper: 1605
+        shoulder_lift: 2698
+        shoulder_pan: 1930
+        wrist_flex: 2775
+        wrist_roll: 1058
+      notes:
+      - requires manual validation before playback
+      source: generated
+  g2:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f1
+        - f3
+        - h1
+        - h3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1708
+        gripper: 1604
+        shoulder_lift: 2560
+        shoulder_pan: 1914
+        wrist_flex: 2688
+        wrist_roll: 1041
+      notes:
+      - requires manual validation before playback
+      source: generated
+  g3:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f3
+        - h3
+        - f1
+        - h1
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1944
+        gripper: 1604
+        shoulder_lift: 2421
+        shoulder_pan: 1898
+        wrist_flex: 2601
+        wrist_roll: 1024
+      notes:
+      - requires manual validation before playback
+      source: generated
+  g4:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f3
+        - h3
+        - f6
+        - h6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2197
+        gripper: 1605
+        shoulder_lift: 2250
+        shoulder_pan: 1859
+        wrist_flex: 2545
+        wrist_roll: 1023
+      notes:
+      - requires manual validation before playback
+      source: generated
+  g5:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f6
+        - h6
+        - f3
+        - h3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2399
+        gripper: 1606
+        shoulder_lift: 2096
+        shoulder_pan: 1812
+        wrist_flex: 2527
+        wrist_roll: 1034
+      notes:
+      - requires manual validation before playback
+      source: generated
+  g6:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f6
+        - h6
+        - f8
+        - h8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2580
+        gripper: 1607
+        shoulder_lift: 1937
+        shoulder_pan: 1752
+        wrist_flex: 2526
+        wrist_roll: 1048
+      notes:
+      - requires manual validation before playback
+      source: generated
+  g7:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f6
+        - f8
+        - h6
+        - h8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2671
+        gripper: 1605
+        shoulder_lift: 1824
+        shoulder_pan: 1694
+        wrist_flex: 2546
+        wrist_roll: 1062
+      notes:
+      - requires manual validation before playback
+      source: generated
+  g8:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - f8
+        - h8
+        - f6
+        - h6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2763
+        gripper: 1603
+        shoulder_lift: 1712
+        shoulder_pan: 1635
+        wrist_flex: 2567
+        wrist_roll: 1075
+      notes:
+      - requires manual validation before playback
+      source: generated
+  h1:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 1182
+        gripper: 1607
+        shoulder_lift: 2868
+        shoulder_pan: 1870
+        wrist_flex: 2884
+        wrist_roll: 1061
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:06:08Z'
+      source: manual
+  h2:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - h1
+        - h3
+        - f1
+        - f3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 1624
+        gripper: 1606
+        shoulder_lift: 2606
+        shoulder_pan: 1865
+        wrist_flex: 2725
+        wrist_roll: 1039
+      notes:
+      - requires manual validation before playback
+      source: generated
+  h3:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 1983
+        gripper: 1608
+        shoulder_lift: 2389
+        shoulder_pan: 1811
+        wrist_flex: 2604
+        wrist_roll: 1014
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:11:58Z'
+      source: manual
+  h4:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - h3
+        - h6
+        - f3
+        - f6
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2129
+        gripper: 1607
+        shoulder_lift: 2289
+        shoulder_pan: 1815
+        wrist_flex: 2571
+        wrist_roll: 1019
+      notes:
+      - requires manual validation before playback
+      source: generated
+  h5:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - h6
+        - h3
+        - f6
+        - f3
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2384
+        gripper: 1607
+        shoulder_lift: 2103
+        shoulder_pan: 1741
+        wrist_flex: 2531
+        wrist_roll: 1023
+      notes:
+      - requires manual validation before playback
+      source: generated
+  h6:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2473
+        gripper: 1608
+        shoulder_lift: 2035
+        shoulder_pan: 1664
+        wrist_flex: 2519
+        wrist_roll: 1018
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:13:12Z'
+      source: manual
+  h7:
+    above_pose:
+      confidence: high
+      generated_at: '2026-05-20T18:22:39Z'
+      interpolation:
+        anchors_used:
+        - h6
+        - h8
+        - f6
+        - f8
+        method: joint_space_idw
+      joints:
+        elbow_flex: 2616
+        gripper: 1607
+        shoulder_lift: 1890
+        shoulder_pan: 1608
+        wrist_flex: 2528
+        wrist_roll: 1046
+      notes:
+      - requires manual validation before playback
+      source: generated
+  h8:
+    above_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2703
+        gripper: 1608
+        shoulder_lift: 1811
+        shoulder_pan: 1468
+        wrist_flex: 2520
+        wrist_roll: 1060
+      notes:
+      - manual safe above-square anchor
+      recorded_at: '2026-05-20T18:06:43Z'
+      source: manual
+version: 1

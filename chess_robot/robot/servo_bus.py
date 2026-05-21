@@ -1,8 +1,8 @@
-"""Read-only servo bus foundation for discovery and position snapshots.
+"""Servo bus foundation for discovery, readback, and guarded micro-motion.
 
 Only this module may communicate directly with the servo bus. The default path
 is a dry-run mock backend. The Feetech backend is isolated here and intentionally
-limited to ping/read operations for the calibration foundation.
+limited to verified ping/read operations plus guarded goal-position writes.
 """
 
 import datetime
@@ -35,7 +35,7 @@ class BackendUnavailable(ServoBusError):
 
 
 class ServoBackend(object):
-    """Minimal read-only servo backend interface."""
+    """Minimal servo backend interface."""
 
     name = "base"
 
@@ -44,6 +44,21 @@ class ServoBackend(object):
 
     def read_position(self, servo_id: int) -> Optional[int]:
         raise NotImplementedError
+
+    def read_goal_position(self, servo_id: int) -> Optional[int]:
+        raise BackendUnavailable(
+            "Goal-position readback is unsupported by backend {!r}.".format(self.name)
+        )
+
+    def read_register(self, servo_id: int, address: int, length: int) -> Optional[int]:
+        raise BackendUnavailable(
+            "Raw register reads are unsupported by backend {!r}.".format(self.name)
+        )
+
+    def write_goal_position(self, servo_id: int, goal_position: int) -> None:
+        raise BackendUnavailable(
+            "Goal-position writes are unsupported by backend {!r}.".format(self.name)
+        )
 
     def torque_enable(self, servo_id: int, enabled: bool) -> None:
         raise BackendUnavailable("Torque writes are unsupported by backend {!r}.".format(self.name))
@@ -61,10 +76,13 @@ class MockServoBackend(ServoBackend):
                  positions: Optional[Dict[Any, Any]] = None) -> None:
         self._servo_ids = set(safety.validate_servo_ids(servo_ids or []))
         self._positions = {}
+        self._goal_positions = {}
         for key, value in (positions or {}).items():
             servo_id = safety.validate_servo_id(key)
             self._servo_ids.add(servo_id)
-            self._positions[servo_id] = int(value)
+            normalized_value = int(value)
+            self._positions[servo_id] = normalized_value
+            self._goal_positions[servo_id] = normalized_value
 
     def ping(self, servo_id: int) -> bool:
         return safety.validate_servo_id(servo_id) in self._servo_ids
@@ -75,26 +93,82 @@ class MockServoBackend(ServoBackend):
             return None
         return self._positions.get(servo_id)
 
+    def read_goal_position(self, servo_id: int) -> Optional[int]:
+        servo_id = safety.validate_servo_id(servo_id)
+        if servo_id not in self._servo_ids:
+            return None
+        return self._goal_positions.get(servo_id, self._positions.get(servo_id))
+
+    def read_register(self, servo_id: int, address: int, length: int) -> Optional[int]:
+        servo_id = safety.validate_servo_id(servo_id)
+        if servo_id not in self._servo_ids:
+            return None
+        address = int(address)
+        length = int(length)
+        if address == 42 and length == 2:
+            return self.read_goal_position(servo_id)
+        if address == 56 and length == 2:
+            return self.read_position(servo_id)
+        return None
+
+    def write_goal_position(self, servo_id: int, goal_position: int) -> None:
+        servo_id = safety.validate_servo_id(servo_id)
+        if servo_id not in self._servo_ids:
+            raise ServoBusError("Servo {} is unavailable in the mock backend.".format(servo_id))
+        normalized_goal = int(goal_position)
+        self._goal_positions[servo_id] = normalized_goal
+        self._positions[servo_id] = normalized_goal
+
 
 class FeetechServoBackend(ServoBackend):
-    """SO-101/Feetech read-only backend.
+    """SO-101/Feetech backend with minimal verified write support.
 
     The preferred path uses scservo_sdk when it is installed. The Nano can also
     use the built-in raw serial transport, which implements Feetech read
-    packets for Model_Number and Present_Position plus one verified SRAM write
-    for Torque_Enable only.
+    packets for Model_Number, Goal_Position, and Present_Position plus verified
+    SRAM writes for Torque_Enable and Goal_Position only.
     """
 
     name = "feetech"
 
     MODEL_NUMBER_ADDRESS = 3
     MODEL_NUMBER_LENGTH = 2
+    MIN_ANGLE_LIMIT_ADDRESS = 9
+    MIN_ANGLE_LIMIT_LENGTH = 2
+    MAX_ANGLE_LIMIT_ADDRESS = 11
+    MAX_ANGLE_LIMIT_LENGTH = 2
+    OPERATING_MODE_ADDRESS = 33
+    OPERATING_MODE_LENGTH = 1
     READ_INSTRUCTION = 0x02
     WRITE_INSTRUCTION = 0x03
     # Verified from local LeRobot source on 2026-05-17:
     # lerobot.motors.feetech.tables.STS_SMS_SERIES_CONTROL_TABLE["Torque_Enable"] == (40, 1)
     TORQUE_ENABLE_ADDRESS = 40
     TORQUE_ENABLE_LENGTH = 1
+    ACCELERATION_ADDRESS = 41
+    ACCELERATION_LENGTH = 1
+    # Verified from local LeRobot source on 2026-05-18:
+    # lerobot.motors.feetech.tables.STS_SMS_SERIES_CONTROL_TABLE["Goal_Position"] == (42, 2)
+    GOAL_POSITION_ADDRESS = 42
+    GOAL_POSITION_LENGTH = 2
+    MOVING_SPEED_ADDRESS = 46
+    MOVING_SPEED_LENGTH = 2
+    LOCK_ADDRESS = 55
+    LOCK_LENGTH = 1
+    PRESENT_POSITION_ADDRESS = 56
+    PRESENT_POSITION_LENGTH = 2
+    PRESENT_SPEED_ADDRESS = 58
+    PRESENT_SPEED_LENGTH = 2
+    PRESENT_LOAD_ADDRESS = 60
+    PRESENT_LOAD_LENGTH = 2
+    PRESENT_VOLTAGE_ADDRESS = 62
+    PRESENT_VOLTAGE_LENGTH = 1
+    PRESENT_TEMPERATURE_ADDRESS = 63
+    PRESENT_TEMPERATURE_LENGTH = 1
+    HARDWARE_ERROR_STATUS_ADDRESS = 65
+    HARDWARE_ERROR_STATUS_LENGTH = 1
+    MOVING_ADDRESS = 66
+    MOVING_LENGTH = 1
 
     def __init__(self, port: Optional[str], baudrate: Optional[int],
                  timeout_seconds: float = 0.1,
@@ -206,6 +280,48 @@ class FeetechServoBackend(ServoBackend):
             return int(value)
         return self._read_raw_register(servo_id, self._position_address, self._position_length)
 
+    def read_goal_position(self, servo_id: int) -> Optional[int]:
+        return self.read_register(servo_id, self.GOAL_POSITION_ADDRESS, self.GOAL_POSITION_LENGTH)
+
+    def read_register(self, servo_id: int, address: int, length: int) -> Optional[int]:
+        servo_id = safety.validate_servo_id(servo_id)
+        register_address = int(address)
+        register_length = int(length)
+        if register_length not in (1, 2):
+            raise BackendUnavailable("Only 1-byte and 2-byte register reads are supported.")
+        if self._transport == "scservo_sdk":
+            method_name = "read1ByteTxRx" if register_length == 1 else "read2ByteTxRx"
+            read_fn = getattr(self._packet_handler, method_name, None)
+            if read_fn is None:
+                raise BackendUnavailable("Configured Feetech SDK has no {} method.".format(method_name))
+            result = read_fn(self._port_handler, servo_id, register_address)
+            value, comm, error = _normalize_packet_result(result, expected_values=3)
+            if comm != self._comm_success or error != self._no_error:
+                return None
+            return int(value)
+        return self._read_raw_register(servo_id, register_address, register_length)
+
+    def write_goal_position(self, servo_id: int, goal_position: int) -> None:
+        servo_id = safety.validate_servo_id(servo_id)
+        goal_value = int(goal_position)
+        if goal_value < 0 or goal_value > 0xFFFF:
+            raise ServoBusError("Goal position {} is outside the 0..65535 range.".format(goal_value))
+        if self._transport == "scservo_sdk":
+            write_fn = getattr(self._packet_handler, "write2ByteTxRx", None)
+            if write_fn is None:
+                raise BackendUnavailable("Configured Feetech SDK has no write2ByteTxRx method.")
+            result = write_fn(self._port_handler, servo_id, self.GOAL_POSITION_ADDRESS, goal_value)
+            comm, error = _normalize_packet_result(result, expected_values=2)
+            if comm != self._comm_success or error != self._no_error:
+                raise ServoBusError(
+                    "Goal-position write failed for servo {}: comm={}, error={}".format(
+                        servo_id, comm, error
+                    )
+                )
+            return
+        values = [goal_value & 0xFF, (goal_value >> 8) & 0xFF]
+        self._write_raw_register(servo_id, self.GOAL_POSITION_ADDRESS, values)
+
     def torque_enable(self, servo_id: int, enabled: bool) -> None:
         servo_id = safety.validate_servo_id(servo_id)
         value = 1 if enabled else 0
@@ -241,7 +357,7 @@ class FeetechServoBackend(ServoBackend):
         self._write_all(packet)
         response = self._read_response(expected_length=6)
         if response is None:
-            raise ServoBusError("No valid status response after torque write to servo {}.".format(servo_id))
+            raise ServoBusError("No valid status response after register write to servo {}.".format(servo_id))
 
     def _build_read_packet(self, servo_id: int, address: int, length: int) -> bytes:
         body = [servo_id, 4, self.READ_INSTRUCTION, address, length]
@@ -332,7 +448,7 @@ class ServoEventLogger(object):
 
 
 class ServoBus(object):
-    """Safe read-only facade used by calibration tools."""
+    """Safe facade used by calibration and guarded micro-motion tools."""
 
     def __init__(self, backend: ServoBackend, logger: ServoEventLogger,
                  dry_run: bool) -> None:
@@ -387,6 +503,96 @@ class ServoBus(object):
             position=position,
         )
         return position
+
+    def read_goal_position(self, servo_id: int) -> Optional[int]:
+        servo_id = safety.validate_servo_id(servo_id)
+        try:
+            position = self.backend.read_goal_position(servo_id)
+        except Exception as exc:
+            self.logger.log(
+                "servo_read_goal_position",
+                servo_id=servo_id,
+                backend=self.backend.name,
+                dry_run=self.dry_run,
+                status="error",
+                error=str(exc),
+            )
+            raise
+        self.logger.log(
+            "servo_read_goal_position",
+            servo_id=servo_id,
+            backend=self.backend.name,
+            dry_run=self.dry_run,
+            status="ok",
+            position=position,
+        )
+        return position
+
+    def read_register(self, servo_id: int, address: int, length: int) -> Optional[int]:
+        servo_id = safety.validate_servo_id(servo_id)
+        try:
+            value = self.backend.read_register(servo_id, address, length)
+        except Exception as exc:
+            self.logger.log(
+                "servo_read_register",
+                servo_id=servo_id,
+                address=int(address),
+                length=int(length),
+                backend=self.backend.name,
+                dry_run=self.dry_run,
+                status="error",
+                error=str(exc),
+            )
+            raise
+        self.logger.log(
+            "servo_read_register",
+            servo_id=servo_id,
+            address=int(address),
+            length=int(length),
+            backend=self.backend.name,
+            dry_run=self.dry_run,
+            status="ok",
+            value=value,
+        )
+        return value
+
+    def write_goal_position(self, servo_id: int, goal_position: int) -> None:
+        servo_id = safety.validate_servo_id(servo_id)
+        goal_value = int(goal_position)
+        if self.dry_run:
+            self.logger.log(
+                "servo_write_goal_position",
+                servo_id=servo_id,
+                goal_position=goal_value,
+                backend=self.backend.name,
+                dry_run=True,
+                status="refused",
+                reason="dry_run",
+            )
+            raise ServoBusError(
+                "Real goal-position writes require --real and are refused in dry-run mode."
+            )
+        try:
+            self.backend.write_goal_position(servo_id, goal_value)
+        except Exception as exc:
+            self.logger.log(
+                "servo_write_goal_position",
+                servo_id=servo_id,
+                goal_position=goal_value,
+                backend=self.backend.name,
+                dry_run=self.dry_run,
+                status="error",
+                error=str(exc),
+            )
+            raise
+        self.logger.log(
+            "servo_write_goal_position",
+            servo_id=servo_id,
+            goal_position=goal_value,
+            backend=self.backend.name,
+            dry_run=self.dry_run,
+            status="ok",
+        )
 
     def torque_enable(self, servo_id: int, enabled: bool) -> None:
         servo_id = safety.validate_servo_id(servo_id)

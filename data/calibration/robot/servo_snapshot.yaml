@@ -17,6 +17,6 @@ joints:
     current_position: 2828
     id: 4
   wrist_roll:
-    current_position: 1091
+    current_position: 1093
     id: 5
-snapshot_utc: '2026-05-19T06:02:24Z'
+snapshot_utc: '2026-05-19T18:32:15Z'
