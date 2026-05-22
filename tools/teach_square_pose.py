@@ -21,9 +21,11 @@ DEFAULT_SERVO_MAP_PATH = os.path.join(ROOT, "data", "calibration", "robot", "ser
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Record one manual above-square pose without moving the robot.")
+    parser = argparse.ArgumentParser(description="Record one manual square pose without moving the robot.")
     parser.add_argument("--square", required=True, help="Target square, for example e4.")
     parser.add_argument("--targets", default=DEFAULT_TARGETS_PATH, help="Square-target YAML path.")
+    parser.add_argument("--pose-name", default="above_pose", choices=robot_square_map.ALLOWED_POSE_NAMES,
+                        help="Pose entry to record. Defaults to above_pose.")
     parser.add_argument("--joint-limits", dest="joint_limits_path", default=DEFAULT_LIMITS_PATH,
                         help="Joint-limits YAML path.")
     parser.add_argument("--servo-map", dest="servo_map_path", default=DEFAULT_SERVO_MAP_PATH,
@@ -34,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Comma-separated joint ticks, for example shoulder_pan=2048,...")
     parser.add_argument("--note", default=None, help="Optional note stored with the manual pose.")
     parser.add_argument("--write", action="store_true", help="Write the updated YAML file.")
-    parser.add_argument("--force", action="store_true", help="Replace an existing manual above_pose.")
+    parser.add_argument("--force", action="store_true", help="Replace an existing manual pose of the selected pose type.")
     return parser
 
 
@@ -117,6 +119,11 @@ def _read_live_joint_positions(servo_map, joint_order):
 def main() -> int:
     args = build_parser().parse_args()
     square_name = robot_square_map.normalise_square_name(args.square)
+    try:
+        pose_name = robot_square_map.validate_pose_name(args.pose_name)
+    except robot_square_map.SquareTargetError as exc:
+        print("ERROR: {}".format(exc))
+        return 1
     targets = robot_square_map.load_square_targets(args.targets)
     joint_limits = robot_square_map.load_joint_limits(args.joint_limits_path)
     servo_map = robot_square_map.load_servo_map(args.servo_map_path)
@@ -137,23 +144,28 @@ def main() -> int:
 
     issues = robot_square_map.validate_pose_joints(joints, joint_limits, joint_order)
     existing_square = targets.get("squares", {}).get(square_name, {})
-    existing_pose = existing_square.get("above_pose") if isinstance(existing_square, dict) else None
-    replaced_generated = bool(isinstance(existing_pose, dict) and existing_pose.get("source") == "generated")
+    existing_pose = existing_square.get(pose_name) if isinstance(existing_square, dict) else None
+    existing_source = existing_pose.get("source") if isinstance(existing_pose, dict) else None
+    would_overwrite = isinstance(existing_pose, dict)
 
     if issues:
         print("Square: {}".format(square_name))
+        print("Pose name: {}".format(pose_name))
         print("Source: manual")
         print("Validation: FAILED")
         print("Issues: {}".format("; ".join(issues)))
         print("File written: no")
+        print("Would overwrite existing pose: {}".format("yes" if would_overwrite else "no"))
+        print("Notes added: {}".format(args.note if args.note else "none"))
         return 1
 
     try:
-        updated = robot_square_map.upsert_manual_above_pose(
+        updated = robot_square_map.upsert_manual_pose(
             targets,
             square_name,
+            pose_name,
             joints,
-            note=args.note,
+            notes=[args.note] if args.note else None,
             force=args.force,
         )
     except robot_square_map.SquareTargetError as exc:
@@ -163,12 +175,19 @@ def main() -> int:
     if args.write:
         robot_square_map.save_yaml_file(args.targets, updated)
 
+    overwrite_label = "no"
+    if would_overwrite:
+        overwrite_label = "yes" if args.write else "would overwrite"
     print("Square: {}".format(square_name))
+    print("Pose name: {}".format(pose_name))
     print("Source: manual")
     print("Joints: {}".format(", ".join(["{}={}".format(name, joints[name]) for name in joint_order])))
     print("Validation: OK")
     print("File written: {}".format("yes" if args.write else "no"))
-    print("Replaced generated pose: {}".format("yes" if replaced_generated else "no"))
+    print("Would write target file: {}".format("yes" if args.write else "no"))
+    print("Existing pose source: {}".format(existing_source or "none"))
+    print("Existing pose overwritten: {}".format(overwrite_label))
+    print("Notes added: {}".format(args.note if args.note else "none"))
     return 0
 
 

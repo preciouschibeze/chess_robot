@@ -387,6 +387,32 @@ squares:
       - manual safe above-square anchor
       recorded_at: '2026-05-20T18:14:53Z'
       source: manual
+    pick_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2062
+        gripper: 1613
+        shoulder_lift: 2499
+        shoulder_pan: 2225
+        wrist_flex: 2437
+        wrist_roll: 1066
+      notes:
+      - open-loop baseline pick depth for first grasp test
+      recorded_at: '2026-05-22T07:59:53Z'
+      source: manual
+    place_pose:
+      confidence: taught
+      joints:
+        elbow_flex: 2044
+        gripper: 1613
+        shoulder_lift: 2497
+        shoulder_pan: 2222
+        wrist_flex: 2480
+        wrist_roll: 1066
+      notes:
+      - open-loop baseline place depth for first grasp test
+      recorded_at: '2026-05-22T08:00:34Z'
+      source: manual
   c4:
     above_pose:
       confidence: high

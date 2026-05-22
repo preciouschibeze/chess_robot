@@ -35,6 +35,7 @@ RECOMMENDED_ANCHORS = [
 ]
 MIN_MANUAL_ANCHORS_FOR_WRITE = 9
 DEFAULT_GENERATED_NOTE = "requires manual validation before playback"
+ALLOWED_POSE_NAMES = ["above_pose", "pick_pose", "place_pose"]
 
 
 class SquareTargetError(ValueError):
@@ -285,23 +286,49 @@ def count_pose_sources(document: Dict[str, Any]) -> Dict[str, int]:
     return counts
 
 
-def build_manual_above_pose(joints: Dict[str, int], note: Optional[str] = None,
-                            recorded_at: Optional[str] = None) -> Dict[str, Any]:
-    notes = []
+def validate_pose_name(pose_name: str) -> str:
+    if pose_name not in ALLOWED_POSE_NAMES:
+        raise SquareTargetError(
+            "pose_name must be one of: {}".format(", ".join(ALLOWED_POSE_NAMES))
+        )
+    return pose_name
+
+
+def _normalise_notes(notes: Optional[Any] = None, note: Optional[str] = None) -> List[str]:
+    result = []
+    if notes is not None:
+        if isinstance(notes, list):
+            result.extend([str(item) for item in notes])
+        else:
+            result.append(str(notes))
     if note:
-        notes.append(str(note))
+        result.append(str(note))
+    return result
+
+
+def build_manual_pose_entry(joints: Dict[str, int], notes: Optional[Any] = None,
+                            timestamp: Optional[str] = None,
+                            note: Optional[str] = None) -> Dict[str, Any]:
     return {
         "source": "manual",
         "confidence": "taught",
         "joints": dict(joints),
-        "recorded_at": recorded_at or _utc_timestamp(),
-        "notes": notes,
+        "recorded_at": timestamp or _utc_timestamp(),
+        "notes": _normalise_notes(notes=notes, note=note),
     }
 
 
-def upsert_manual_above_pose(document: Dict[str, Any], square: str, joints: Dict[str, int],
-                             note: Optional[str] = None, force: bool = False,
-                             recorded_at: Optional[str] = None) -> Dict[str, Any]:
+def build_manual_above_pose(joints: Dict[str, int], note: Optional[str] = None,
+                            recorded_at: Optional[str] = None) -> Dict[str, Any]:
+    return build_manual_pose_entry(joints, note=note, timestamp=recorded_at)
+
+
+def upsert_manual_pose(document: Dict[str, Any], square: str, pose_name: str,
+                       joints: Dict[str, int], notes: Optional[Any] = None,
+                       force: bool = False,
+                       recorded_at: Optional[str] = None,
+                       note: Optional[str] = None) -> Dict[str, Any]:
+    pose_key = validate_pose_name(pose_name)
     doc = normalise_square_targets_document(document)
     square_name = normalise_square_name(square)
     square_info = doc.get("squares", {}).get(square_name)
@@ -310,13 +337,32 @@ def upsert_manual_above_pose(document: Dict[str, Any], square: str, joints: Dict
         doc["squares"][square_name] = square_info
     elif not isinstance(square_info, dict):
         raise SquareTargetError("square entry for {} must be a mapping".format(square_name))
-    existing = square_info.get("above_pose")
+    existing = square_info.get(pose_key)
     if isinstance(existing, dict) and existing.get("source") == "manual" and not force:
         raise SquareTargetError(
-            "square {} already has a manual above_pose; use --force to replace it.".format(square_name)
+            "square {} already has a manual {}; use --force to replace it.".format(square_name, pose_key)
         )
-    square_info["above_pose"] = build_manual_above_pose(joints, note=note, recorded_at=recorded_at)
+    square_info[pose_key] = build_manual_pose_entry(
+        joints,
+        notes=notes,
+        note=note,
+        timestamp=recorded_at,
+    )
     return doc
+
+
+def upsert_manual_above_pose(document: Dict[str, Any], square: str, joints: Dict[str, int],
+                             note: Optional[str] = None, force: bool = False,
+                             recorded_at: Optional[str] = None) -> Dict[str, Any]:
+    return upsert_manual_pose(
+        document,
+        square,
+        "above_pose",
+        joints,
+        note=note,
+        force=force,
+        recorded_at=recorded_at,
+    )
 
 
 def _coerce_anchor_joints(joints: Any, joint_order: List[str]) -> Optional[Dict[str, int]]:
