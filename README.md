@@ -1,65 +1,236 @@
 # Chess Robot
 
-This repository is the initial lightweight skeleton for a low-cost, perception-guided chess-playing robot arm system running on a Jetson Nano.
+Python-only software for a Jetson Nano chess-playing robot arm.
 
-The eventual system should observe a fixed chessboard with an overhead camera, detect human moves using occupancy-first vision, maintain symbolic chess state using chess legality constraints, select robot moves with Stockfish, execute calibrated and safety-checked motion primitives, and log results for debugging and evaluation.
+The system uses a fixed overhead camera, calibrated board geometry, occupancy detection, chess-state tracking, Stockfish move selection, and safety-checked servo motion primitives to move chess pieces on a physical board.
 
-## Current Status
+The robot plays as **black**.
 
-This repository is skeleton-only. It does not yet implement board detection, occupancy detection, servo control, Stockfish integration, gameplay, or real robot motion.
+---
 
-The current phase prioritizes narrow vertical slices of working functionality over broad framework completion.
+## Current Scope
 
-## Runtime Model
+The current development focus is **physical pick-and-place validation**.
 
-- Runtime target: Jetson Nano
-- Laptop role: remote development, VS Code/Codex interface, SSH terminal, diff review, log review, and viewing saved debug images
-- Language: Python only
-- ROS: not used
-- MoveIt: not used
-- Target Python: Python 3.6 on Jetson Nano / JetPack 4.x
+The immediate goal is not full autonomous gameplay. The immediate goal is:
 
-The Nano should eventually own camera access, the servo bus adapter, gripper control, Stockfish runtime, chess logic runtime, calibration tools, robot execution tools, logs, and debug outputs.
+```text
+one piece
+one source square
+one destination square
+safe robot motion
+working gripper action
+overhead-camera verification
+full logs
+```
 
-## Active Scope
+Current active work:
 
-1. Repository skeleton
-2. Basic project documentation
-3. Overhead camera capture later
-4. Board calibration later
-5. Occupancy detection later
-6. Occupancy-grid rendering later
-7. Servo discovery later
-8. Servo ID-to-joint mapping later
-9. Safe dry-run servo commands later
-10. Safe single-joint micro-motion later
+- validate calibrated square targets
+- test safe above-square motion
+- add and verify pick/place poses
+- execute one non-visual pick-and-place sequence
+- measure backlash and placement error
+- verify the board state with the overhead camera after movement
+- use the results to decide where wrist-camera visual refinement is needed
 
-Future modules are placeholders until explicitly activated.
+Wrist-camera visual servoing is planned later, after the blind pick-and-place baseline is measured.
 
-## Architecture Overview
+---
 
-- `chess_robot/vision`: future camera capture, board calibration, occupancy detection, and rendered debug outputs
-- `chess_robot/calibration`: future measured camera, board, servo, gripper, and square-map profiles
-- `chess_robot/chess_logic`: future symbolic board state, legal move matching, and Stockfish boundary
-- `chess_robot/planning`: future conversion from chess moves into robot task plans
-- `chess_robot/robot`: future safety checks, servo bus access, arm control, motion primitives, and gripper control
-- `chess_robot/gui`: future interpreted board-state and saved-output views, plus manual ambiguity confirmation
-- `tools`: small command-line entry points for future vertical-slice tests
-- `configs`: safe placeholder configuration files with no invented hardware values
-- `data`: calibration, snapshot, debug, GUI, and log output directories
+## System Overview
 
-Robot-black board orientation must be preserved: top-left `h1`, top-right `a1`, bottom-left `h8`, bottom-right `a8`.
+```text
+Overhead camera
+  -> board calibration
+  -> occupancy detection
+  -> changed-square detection
+  -> legal move matching
+  -> python-chess board state
+  -> Stockfish robot move
+  -> task planner
+  -> motion primitives
+  -> servo + gripper control
+  -> overhead verification
+```
 
-## Environment Note
+Core design choices:
 
-The Nano runtime environment is documented in `docs/ENVIRONMENT.md`. Use `requirements-nano.txt` inside the `.venv` created with `--system-site-packages`.
+- Python only
+- Jetson Nano runtime
+- no ROS
+- no MoveIt
+- fixed board
+- fixed overhead camera
+- robot always plays black
+- occupancy-first vision
+- manual confirmation when vision is ambiguous
+- dry-run default for hardware tools
 
-Do not install `opencv-python` with pip on the Nano. The runtime should use Jetson system OpenCV through the virtual environment.
+---
 
-## Recommended First Milestones
+## Board Orientation
 
-1. Camera test
-2. Board calibration
-3. Occupancy detection
-4. Servo scanning
-5. Dry-run motion primitives
+The board is mapped from the robot-black side:
+
+```text
+top-left     = h1
+top-right    = a1
+bottom-left  = h8
+bottom-right = a8
+```
+
+Grid mapping:
+
+```python
+def grid_to_square(row: int, col: int) -> str:
+    files = "hgfedcba"
+    return f"{files[col]}{row + 1}"
+```
+
+---
+
+## Repository Layout
+
+```text
+chess_robot/
+├── app/            # application entry points
+├── calibration/    # calibration profile loaders and square maps
+├── chess_logic/    # board state, legal move matching, Stockfish interface
+├── gui/            # terminal and debug display helpers
+├── planning/       # chess move to physical action planning
+├── robot/          # servo bus, safety, arm control, gripper, primitives
+└── vision/         # camera, board calibration, occupancy, transitions
+
+configs/            # runtime configuration
+data/               # calibration files, snapshots, debug outputs, logs
+docs/               # project documentation and current scope
+tests/              # hardware-free tests
+tools/              # command-line tools for calibration and validation
+```
+
+---
+
+## Setup
+
+On the Jetson Nano:
+
+```bash
+cd /data/chess_robot
+python3 -m venv .venv --system-site-packages
+source .venv/bin/activate
+python3 -m pip install -r requirements-nano.txt
+```
+
+Verify the environment:
+
+```bash
+python3 tools/verify_environment.py
+```
+
+Run tests:
+
+```bash
+python3 -m pytest
+```
+
+---
+
+## Common Commands
+
+Camera test:
+
+```bash
+python3 tools/test_camera.py
+```
+
+Board calibration:
+
+```bash
+python3 tools/calibrate_board.py
+```
+
+Occupancy detection:
+
+```bash
+python3 tools/detect_occupancy.py
+```
+
+Changed-square detection:
+
+```bash
+python3 tools/detect_changed_squares.py
+```
+
+Servo scan:
+
+```bash
+python3 tools/scan_servos.py
+```
+
+Read servo positions:
+
+```bash
+python3 tools/read_servo_positions.py
+```
+
+Gripper test:
+
+```bash
+python3 tools/test_gripper_monitored_motion.py
+```
+
+Square target audit:
+
+```bash
+python3 tools/audit_square_targets.py
+```
+
+Test above-square motion:
+
+```bash
+python3 tools/test_square_above_motion.py
+```
+
+Plan a robot move:
+
+```bash
+python3 tools/plan_robot_move.py --move e7e5
+```
+
+Resolve motion primitives:
+
+```bash
+python3 tools/resolve_move_plan.py
+```
+
+---
+
+## Safety Rules
+
+- Hardware tools must default to dry-run.
+- Real motion must require explicit confirmation.
+- Servo IDs must be mapped before movement.
+- Joint limits must be loaded before movement.
+- All target poses must be validated before execution.
+- No module should bypass `chess_robot/robot/safety.py`.
+- Only `chess_robot/robot/servo_bus.py` should communicate directly with the servo bus.
+- Do not run full-game execution until pick-and-place works reliably.
+
+---
+
+## Minimum Working Demonstration
+
+A successful minimum demonstration is:
+
+```text
+1. Capture the board with the overhead camera.
+2. Detect the current board occupancy.
+3. Move one chess piece from a source square to a destination square.
+4. Release the piece cleanly.
+5. Capture the board again.
+6. Verify the expected occupancy change.
+7. Save logs and debug outputs.
+```
+
+This is the current practical milestone.
