@@ -1,0 +1,18 @@
+scene:
+  robot_base:
+    xyz_m: [0.0, 0.0, 0.081]   # Robot base origin
+    rpy_deg: [0.0, 0.0, -90.0]  # Robot base rotation
+    size_m: [0.110, 0.087, 0.081]  # approximate X, Y, Z size
+
+  overhead_camera:
+    xyz_m: [0.115, 0.0, 0.645] # camera origin
+    size_m: [0.036, 0.025, 0.05]  # structure size estimate
+
+  chessboard:
+    xyz_m: [0.003, 0.220, 0.026]  # centre
+    size_m: 0.252                 # square-to-square width including gap
+    height_m: 0.026
+
+  capture_zone:
+    xyz_m: [0.203, 0.220, 0.0]   # centre
+    size_m: [0.040, 0.140, 0.05] # length, breadth, approximate height
