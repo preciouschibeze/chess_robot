@@ -1,0 +1,40 @@
+safety_limits:
+  source: manual_recalibration_required
+  calibrated: false
+  notes: "Broad hard software safety limits. Must remain inside mechanical and EEPROM limits."
+
+  joints:
+    shoulder_pan:
+      min_tick: 876
+      max_tick: 3078
+      neutral_tick: 1074
+      margin_ticks: 20
+      status: copied_from_previous_joint_limits_until_recalibrated
+
+    shoulder_lift:
+      min_tick: 857
+      max_tick: 3232
+      neutral_tick: 895
+      margin_ticks: 20
+      status: copied_from_previous_joint_limits_until_recalibrated
+
+    elbow_flex:
+      min_tick: 923
+      max_tick: 3040
+      neutral_tick: 3030
+      margin_ticks: 20
+      status: copied_from_previous_joint_limits_until_recalibrated
+
+    wrist_flex:
+      min_tick: 894
+      max_tick: 3001
+      neutral_tick: 1905
+      margin_ticks: 20
+      status: broad_safety_recalibrated
+
+    wrist_roll:
+      min_tick: 120
+      max_tick: 3978
+      neutral_tick: 1093
+      margin_ticks: 20
+      status: broad_safety_recalibrated

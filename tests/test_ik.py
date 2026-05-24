@@ -22,6 +22,7 @@ from chess_robot.robot.joint_calibration import convert_pose_ticks_to_urdf_radia
 from chess_robot.robot.joint_calibration import load_joint_calibration
 from chess_robot.robot.joint_calibration import load_joint_limits
 from chess_robot.robot.joint_calibration import load_pose_ticks
+from chess_robot.robot.joint_limits import load_joint_safety_limits
 from chess_robot.robot.reachability import generate_targets
 from chess_robot.robot.reachability import resolve_joint_limit_bounds
 from chess_robot.robot.tool_frames import compute_tcp_transform
@@ -36,6 +37,7 @@ SCENE_PATH = os.path.join(ROOT, "data", "calibration", "robot", "scene_geometry.
 TOOL_FRAMES_PATH = os.path.join(ROOT, "data", "calibration", "gripper", "tool_frames.yaml")
 JOINT_CALIBRATION_PATH = os.path.join(ROOT, "data", "calibration", "robot", "joint_calibration.yaml")
 JOINT_LIMITS_PATH = os.path.join(ROOT, "data", "calibration", "robot", "joint_limits.yaml")
+JOINT_SAFETY_LIMITS_PATH = os.path.join(ROOT, "data", "calibration", "robot", "joint_safety_limits.yaml")
 HOME_POSE_PATH = os.path.join(ROOT, "data", "calibration", "robot", "home_pose.yaml")
 
 
@@ -50,12 +52,14 @@ def load_common_context():
     scene_geometry = load_scene_geometry(SCENE_PATH)
     calibration = load_joint_calibration(JOINT_CALIBRATION_PATH)
     joint_limits = load_joint_limits(JOINT_LIMITS_PATH)
+    joint_safety_limits = load_joint_safety_limits(JOINT_SAFETY_LIMITS_PATH)
     home_joint_positions = load_home_joint_positions()
     tool_frames = load_tool_frames(TOOL_FRAMES_PATH)
     tool_frame = get_tool_frame(tool_frames, "gripper_frame")
     joint_limit_bounds = resolve_joint_limit_bounds(
         model,
         joint_limits=joint_limits,
+        joint_safety_limits=joint_safety_limits,
         calibration=calibration,
     )
     return model, scene_geometry, calibration, home_joint_positions, tool_frame, joint_limit_bounds
@@ -134,3 +138,26 @@ def test_gripper_is_excluded_from_ik_outputs():
     )
     assert "gripper" not in result.joint_positions_rad
     assert sorted(result.joint_positions_rad.keys()) == sorted(EXPECTED_ARM_JOINT_NAMES)
+
+
+def test_legacy_and_safety_joint_limit_bounds_currently_match():
+    model = load_urdf_model(URDF_PATH)
+    calibration = load_joint_calibration(JOINT_CALIBRATION_PATH)
+    legacy_joint_limits = load_joint_limits(JOINT_LIMITS_PATH)
+    joint_safety_limits = load_joint_safety_limits(JOINT_SAFETY_LIMITS_PATH)
+
+    legacy_bounds = resolve_joint_limit_bounds(
+        model,
+        joint_limits=legacy_joint_limits,
+        calibration=calibration,
+    )
+    safety_bounds = resolve_joint_limit_bounds(
+        model,
+        joint_safety_limits=joint_safety_limits,
+        calibration=calibration,
+    )
+
+    assert legacy_bounds["software_profile_kind"] == "legacy"
+    assert safety_bounds["software_profile_kind"] == "safety"
+    assert np.allclose(legacy_bounds["lower_limits"], safety_bounds["lower_limits"])
+    assert np.allclose(legacy_bounds["upper_limits"], safety_bounds["upper_limits"])

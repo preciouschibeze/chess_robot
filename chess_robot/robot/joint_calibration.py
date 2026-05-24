@@ -4,6 +4,9 @@ import math
 
 import yaml
 
+from chess_robot.robot.joint_limits import convert_limits_ticks_to_angle_limits as _convert_limits_ticks_to_angle_limits
+from chess_robot.robot.joint_limits import load_joint_limits as _load_legacy_joint_limits
+
 
 def load_joint_calibration(path):
     data = _load_yaml_mapping(path, "joint calibration")
@@ -73,11 +76,7 @@ def load_pose_ticks(path):
 
 
 def load_joint_limits(path):
-    data = _load_yaml_mapping(path, "joint limits")
-    limits = data.get("limits") or data.get("joints") or {}
-    if not isinstance(limits, dict):
-        raise ValueError("Joint limits file must contain a 'limits' mapping.")
-    return limits
+    return _load_legacy_joint_limits(path)
 
 
 def tick_to_angle_deg(joint_name, tick, calibration):
@@ -117,64 +116,7 @@ def convert_pose_ticks_to_urdf_radians(pose_ticks, calibration):
 
 
 def convert_limits_ticks_to_angle_limits(joint_limits, calibration):
-    converted = {}
-    for user_joint in calibration["joint_order"]:
-        entry = calibration["joints"][user_joint]
-        limit_entry = _lookup_joint_entry(joint_limits, user_joint, entry["urdf_joint"])
-        if not isinstance(limit_entry, dict):
-            continue
-
-        min_tick = _extract_named_int(limit_entry, ("provisional_min", "min", "lower"))
-        max_tick = _extract_named_int(limit_entry, ("provisional_max", "max", "upper"))
-        neutral_tick = _extract_named_int(limit_entry, ("neutral",))
-        converted_entry = {
-            "user_joint": user_joint,
-            "urdf_joint": entry["urdf_joint"],
-            "direction_sign": entry["direction_sign"],
-            "zero_tick": entry["zero_tick"],
-            "provisional_min_tick": min_tick,
-            "provisional_max_tick": max_tick,
-            "neutral_tick": neutral_tick,
-        }
-
-        if min_tick is not None:
-            converted_entry["provisional_min_deg"] = tick_to_angle_deg(user_joint, min_tick, calibration)
-            converted_entry["provisional_min_rad"] = tick_to_angle_rad(user_joint, min_tick, calibration)
-        else:
-            converted_entry["provisional_min_deg"] = None
-            converted_entry["provisional_min_rad"] = None
-
-        if max_tick is not None:
-            converted_entry["provisional_max_deg"] = tick_to_angle_deg(user_joint, max_tick, calibration)
-            converted_entry["provisional_max_rad"] = tick_to_angle_rad(user_joint, max_tick, calibration)
-        else:
-            converted_entry["provisional_max_deg"] = None
-            converted_entry["provisional_max_rad"] = None
-
-        if neutral_tick is not None:
-            converted_entry["neutral_deg"] = tick_to_angle_deg(user_joint, neutral_tick, calibration)
-            converted_entry["neutral_rad"] = tick_to_angle_rad(user_joint, neutral_tick, calibration)
-        else:
-            converted_entry["neutral_deg"] = None
-            converted_entry["neutral_rad"] = None
-
-        if min_tick is not None and max_tick is not None:
-            lower_deg = min(converted_entry["provisional_min_deg"], converted_entry["provisional_max_deg"])
-            upper_deg = max(converted_entry["provisional_min_deg"], converted_entry["provisional_max_deg"])
-            lower_rad = min(converted_entry["provisional_min_rad"], converted_entry["provisional_max_rad"])
-            upper_rad = max(converted_entry["provisional_min_rad"], converted_entry["provisional_max_rad"])
-        else:
-            lower_deg = None
-            upper_deg = None
-            lower_rad = None
-            upper_rad = None
-
-        converted_entry["lower_deg"] = lower_deg
-        converted_entry["upper_deg"] = upper_deg
-        converted_entry["lower_rad"] = lower_rad
-        converted_entry["upper_rad"] = upper_rad
-        converted[entry["urdf_joint"]] = converted_entry
-    return converted
+    return _convert_limits_ticks_to_angle_limits(joint_limits, calibration)
 
 
 def get_calibration_entry(joint_name, calibration):

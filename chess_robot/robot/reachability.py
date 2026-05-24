@@ -3,7 +3,8 @@ from __future__ import absolute_import
 import numpy as np
 
 from chess_robot.robot.fk import compute_fk
-from chess_robot.robot.joint_calibration import convert_limits_ticks_to_angle_limits
+from chess_robot.robot.joint_limits import convert_limits_ticks_to_angle_limits
+from chess_robot.robot.joint_limits import resolve_hard_limit_profile
 from chess_robot.robot.urdf_model import DEFAULT_END_LINK
 from chess_robot.robot.urdf_model import EXPECTED_ARM_JOINT_NAMES
 from chess_robot.robot.workspace import transform_points_to_world
@@ -153,15 +154,22 @@ def resolve_joint_limit_bounds(
     model,
     limit_source=LIMIT_SOURCE_INTERSECTION,
     joint_limits=None,
+    joint_safety_limits=None,
     calibration=None,
     end_link=DEFAULT_END_LINK,
 ):
     arm_chain = model.get_arm_chain(end_link=end_link)
     software_limits = None
+    software_profile_kind = None
+    warnings = []
     if limit_source in (LIMIT_SOURCE_SOFTWARE, LIMIT_SOURCE_INTERSECTION):
-        if joint_limits is None or calibration is None:
+        if calibration is None:
             raise ValueError("Software or intersection limit source requires joint limits and calibration.")
-        software_limits = convert_limits_ticks_to_angle_limits(joint_limits, calibration)
+        hard_limit_profile, software_profile_kind, warnings = resolve_hard_limit_profile(
+            joint_limits=joint_limits,
+            joint_safety_limits=joint_safety_limits,
+        )
+        software_limits = convert_limits_ticks_to_angle_limits(hard_limit_profile, calibration)
 
     joint_names = []
     lower_limits = []
@@ -207,14 +215,17 @@ def resolve_joint_limit_bounds(
                 "software_upper_rad": software_upper,
                 "selected_lower_rad": selected_lower,
                 "selected_upper_rad": selected_upper,
+                "software_profile_kind": software_profile_kind,
             }
         )
     return {
         "source": str(limit_source),
+        "software_profile_kind": software_profile_kind,
         "joint_names": joint_names,
         "lower_limits": np.asarray(lower_limits, dtype=float),
         "upper_limits": np.asarray(upper_limits, dtype=float),
         "joint_entries": joint_entries,
+        "warnings": warnings,
     }
 
 

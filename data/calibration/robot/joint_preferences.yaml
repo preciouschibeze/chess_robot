@@ -1,0 +1,26 @@
+joint_preferences:
+  source: chess_task_preference
+  notes: "Soft posture preferences for chess. These are not hard safety limits."
+
+  joints:
+    shoulder_pan:
+      preferred_tick: 1074
+      weight: 0.1
+
+    shoulder_lift:
+      preferred_tick: 895
+      weight: 0.2
+
+    elbow_flex:
+      preferred_tick: 3030
+      weight: 0.2
+
+    wrist_flex:
+      preferred_tick: 1905
+      weight: 0.5
+      preferred_range_ticks: [1145, 2935]
+
+    wrist_roll:
+      preferred_tick: 1093
+      weight: 0.8
+      preferred_range_ticks: [379, 2350]

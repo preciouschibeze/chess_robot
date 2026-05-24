@@ -26,6 +26,9 @@ from chess_robot.robot.joint_calibration import convert_pose_ticks_to_urdf_radia
 from chess_robot.robot.joint_calibration import load_joint_calibration
 from chess_robot.robot.joint_calibration import load_joint_limits
 from chess_robot.robot.joint_calibration import load_pose_ticks
+from chess_robot.robot.joint_limits import convert_joint_preferences_to_urdf_radians
+from chess_robot.robot.joint_limits import load_joint_preferences
+from chess_robot.robot.joint_limits import load_joint_safety_limits
 from chess_robot.robot.reachability import LIMIT_SOURCE_INTERSECTION
 from chess_robot.robot.reachability import LIMIT_SOURCE_SOFTWARE
 from chess_robot.robot.reachability import LIMIT_SOURCE_URDF
@@ -42,6 +45,8 @@ DEFAULT_URDF_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "so1
 DEFAULT_SCENE_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "scene_geometry.yaml")
 DEFAULT_JOINT_CALIBRATION_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "joint_calibration.yaml")
 DEFAULT_JOINT_LIMITS_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "joint_limits.yaml")
+DEFAULT_JOINT_SAFETY_LIMITS_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "joint_safety_limits.yaml")
+DEFAULT_JOINT_PREFERENCES_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "joint_preferences.yaml")
 DEFAULT_HOME_POSE_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "home_pose.yaml")
 POSITION_ONLY_WARNING = "WARNING: position-only IK does not prove orientation, collision, or vertical descent feasibility."
 ASYMMETRIC_GRIPPER_WARNING = "WARNING: zero-offset gripper_frame is provisional for asymmetric gripper handling."
@@ -54,6 +59,16 @@ def build_parser():
     parser.add_argument("--scene", default=DEFAULT_SCENE_PATH, help="Scene geometry YAML path.")
     parser.add_argument("--joint-calibration", default=DEFAULT_JOINT_CALIBRATION_PATH, help="Joint calibration YAML path.")
     parser.add_argument("--joint-limits", default=DEFAULT_JOINT_LIMITS_PATH, help="Joint software limits YAML path.")
+    parser.add_argument(
+        "--joint-safety-limits",
+        default=None,
+        help="Joint safety limits YAML path. When omitted, legacy joint_limits.yaml is used as the hard software limit source.",
+    )
+    parser.add_argument(
+        "--joint-preferences",
+        default=None,
+        help="Joint soft preference YAML path. Loaded for inspection and future posture guidance only.",
+    )
     parser.add_argument("--home-pose", default=DEFAULT_HOME_POSE_PATH, help="Saved servo home pose YAML path.")
     parser.add_argument("--tool-frames", default=None, help="Tool frame YAML path.")
     parser.add_argument("--tcp-frame", default=None, help="Requested TCP frame name from the tool frame YAML.")
@@ -83,12 +98,16 @@ def main():
     scene_geometry = load_scene_geometry(args.scene)
     calibration = load_joint_calibration(args.joint_calibration) if args.joint_calibration else None
     joint_limits = load_joint_limits(args.joint_limits) if args.joint_limits else None
+    joint_safety_limits = load_joint_safety_limits(args.joint_safety_limits) if args.joint_safety_limits else None
+    joint_preferences = load_joint_preferences(args.joint_preferences) if args.joint_preferences else None
 
     for warning in scene_geometry.get("warnings", []):
         print(warning)
     if calibration is not None:
         for warning in calibration.get("warnings", []):
             print(warning)
+        if joint_preferences is not None:
+            convert_joint_preferences_to_urdf_radians(joint_preferences, calibration)
 
     tool_frame, tool_frame_warning = resolve_tool_frame(args.tool_frames, args.tcp_frame, args.end_link)
     if tool_frame_warning:
@@ -101,9 +120,12 @@ def main():
         model,
         limit_source=args.limit_source,
         joint_limits=joint_limits,
+        joint_safety_limits=joint_safety_limits,
         calibration=calibration,
         end_link=args.end_link,
     )
+    for warning in joint_limit_bounds.get("warnings", []):
+        print(warning)
 
     home_seed = load_home_seed(args.home_pose, calibration)
     workspace_seed = None
@@ -184,6 +206,8 @@ def main():
             "scene_path": args.scene,
             "joint_calibration_path": args.joint_calibration,
             "joint_limits_path": args.joint_limits,
+            "joint_safety_limits_path": args.joint_safety_limits,
+            "joint_preferences_path": args.joint_preferences,
             "home_pose_path": args.home_pose,
             "tool_frames_path": args.tool_frames,
             "requested_tcp_frame": args.tcp_frame,
@@ -193,6 +217,7 @@ def main():
             "target_world_m": [float(value) for value in target_world],
             "target_robot_m": [float(value) for value in target_robot],
             "limit_source": joint_limit_bounds["source"],
+            "joint_limit_profile_kind": joint_limit_bounds.get("software_profile_kind"),
             "random_seeds": int(args.random_seeds),
             "workspace_seed_samples": int(args.workspace_seed_samples),
             "seed": args.seed,
