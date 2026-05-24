@@ -3,6 +3,8 @@ scene:
     xyz_m: [0.0, 0.0, 0.081]   # Robot base origin
     rpy_deg: [0.0, 0.0, -90.0]  # Robot base rotation
     size_m: [0.110, 0.087, 0.081]  # approximate X, Y, Z size
+    # rpy_deg uses the workspace tool's world_T_robot_base convention.
+    # For this setup, yaw -90 aligns the URDF arm-forward direction with the physical board-forward direction.
 
   overhead_camera:
     xyz_m: [0.115, 0.0, 0.645] # camera origin
