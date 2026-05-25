@@ -14,6 +14,8 @@ from chess_robot.robot.approach_policy import ApproachPolicyError
 from chess_robot.robot.approach_policy import apply_approach_policy
 from chess_robot.robot.safe_transfer import CONFIRM_TEXT
 from chess_robot.robot.safe_transfer import DEFAULT_CSV_LOG_PATH
+from chess_robot.robot.safe_transfer import RETURN_STRATEGY_RESOLVE_NEW
+from chess_robot.robot.safe_transfer import RETURN_STRATEGY_REVERSE_REPLAY
 from chess_robot.robot.safe_transfer import run_safe_square_transfer
 from chess_robot.robot.reachability import LIMIT_SOURCE_INTERSECTION
 from chess_robot.robot.reachability import LIMIT_SOURCE_SOFTWARE
@@ -103,6 +105,7 @@ def build_parser():
     parser.add_argument("--execute", action="store_true", help="Command hardware after all segment checks.")
     parser.add_argument("--confirm", default=None, help="Typed execute confirmation.")
     parser.add_argument("--return-home", action="store_true", help="Return to saved home through high waypoints after reaching target normal-above.")
+    parser.add_argument("--return-strategy", choices=(RETURN_STRATEGY_REVERSE_REPLAY, RETURN_STRATEGY_RESOLVE_NEW), default=RETURN_STRATEGY_REVERSE_REPLAY, help="How to build return segments after the forward target stages.")
     parser.set_defaults(assume_start_home=True)
     parser.add_argument("--assume-start-home", dest="assume_start_home", action="store_true", help="Dry-run start state is saved home. Default true.")
     parser.add_argument("--no-assume-start-home", dest="assume_start_home", action="store_false", help="Reject dry-run until a non-home start source exists.")
@@ -146,16 +149,18 @@ def print_report(log, output_path):
         print("IK seed notes: %s" % json.dumps(log.get("ik_seed_notes"), sort_keys=False))
     if log.get("resolved_policy") is not None:
         print("Resolved policy: %s" % json.dumps(log["resolved_policy"], sort_keys=True))
+    print("Return strategy: %s" % log.get("return_strategy"))
     if log.get("locked_joints"):
         print("Locked joints: %s" % ", ".join(sorted(log["locked_joints"].keys())))
     print("Segments:")
     for segment in log.get("segments", []):
         path = segment.get("path_validation") or {}
         print(
-            "  %d. %s ik=%s path=%s tilt=%s min_z=%s settle=%s seed=%s command=%s abort=%s"
+            "  %d. %s replay=%s ik=%s path=%s tilt=%s min_z=%s settle=%s seed=%s command=%s abort=%s"
             % (
                 int(segment["segment_index"]),
                 segment["segment_name"],
+                segment.get("replay_source_segment") or "-",
                 segment.get("ik_success"),
                 path.get("passed"),
                 format_optional_float(segment.get("approach_tilt_deg")),

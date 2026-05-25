@@ -1,20 +1,23 @@
 ik_seed_poses:
-  version: 1
-  notes:
-    - "Square-specific IK seed poses for difficult board squares."
-    - "Seed poses are starting guesses for numerical IK, not final commanded targets."
-    - "All final targets still require IK, joint safety checks, and path validation."
-
   default:
     seed_source: current_or_home
-
+  notes:
+  - Square-specific IK seed poses for difficult board squares.
+  - Seed poses are starting guesses for numerical IK, not final commanded targets.
+  - All final targets still require IK, joint safety checks, and path validation.
   squares:
     a1:
-      notes: "Placeholder. Replace with manually taught extended posture."
-      seed_ticks: {}
+      notes: Manually taught extended high-clearance posture for a1.
+      seed_ticks:
+        elbow_flex: 1096
+        shoulder_lift: 2876
+        shoulder_pan: 2326
+        wrist_flex: 2908
+        wrist_roll: 1091
     b1:
-      notes: "Placeholder. Replace with manually taught extended posture."
+      notes: Placeholder. Replace with manually taught extended posture.
       seed_ticks: {}
     h1:
-      notes: "Placeholder. Replace with manually taught extended posture."
+      notes: Placeholder. Replace with manually taught extended posture.
       seed_ticks: {}
+  version: 1

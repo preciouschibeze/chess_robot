@@ -200,6 +200,26 @@ def test_return_home_plan_adds_return_segments():
     assert [item["segment_name"] for item in plan][-3:] == ["target_high_above_return", "home_high", "home_pose"]
 
 
+def test_return_home_plan_marks_reverse_replay_sources():
+    args = _args("/tmp", ["--return-home"])
+    plan = safe_transfer.build_staged_plan(
+        [0.0, 0.0, 0.050],
+        [0.2, 0.1, 0.026],
+        [0.0, 0.0, 0.050],
+        0.026,
+        args,
+    )
+    by_name = dict((item["segment_name"], item) for item in plan)
+    assert by_name["target_high_above_return"]["replay_source_segment"] == "target_high_above"
+    assert by_name["home_high"]["replay_source_segment"] == "current_lift"
+    assert by_name["home_pose"]["is_return_segment"] is True
+
+
+def test_return_strategy_defaults_to_reverse_replay():
+    args = _args("/tmp")
+    assert args.return_strategy == safe_transfer.RETURN_STRATEGY_REVERSE_REPLAY
+
+
 def test_target_offsets_are_used_in_plan():
     args = _args("/tmp", ["--normal-above-offset-m", "0.081", "--high-above-offset-m", "0.123"])
     plan = safe_transfer.build_staged_plan(
@@ -356,6 +376,146 @@ def test_path_validation_is_called_for_every_segment(tmpdir, monkeypatch):
     assert calls["count"] == 3
 
 
+def test_reverse_replay_reuses_forward_targets_and_skips_return_ik(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    calls = []
+
+    def recording_solver(*args, **kwargs):
+        del kwargs
+        call_index = len(calls) + 1
+        ticks = _home_ticks()
+        ticks["shoulder_pan"] = int(ticks["shoulder_pan"]) + (call_index * 10)
+        ticks["shoulder_lift"] = int(ticks["shoulder_lift"]) + (call_index * 20)
+        calls.append(call_index)
+        return FakeIKResult(args[1], joint_positions_rad=_radians_from_ticks(ticks))
+
+    args = _args(tmpdir, ["--return-home"])
+    log = safe_transfer.run_safe_square_transfer(
+        args,
+        ik_solver=recording_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    with open(args.output, "r") as handle:
+        saved = json.load(handle)
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    saved_by_name = dict((segment["segment_name"], segment) for segment in saved["segments"])
+    assert len(calls) == 3
+    assert by_name["target_high_above_return"]["target_ticks"] == by_name["target_high_above"]["target_ticks"]
+    assert by_name["home_high"]["target_ticks"] == by_name["current_lift"]["target_ticks"]
+    assert by_name["target_high_above_return"]["replay_source_segment"] == "target_high_above"
+    assert by_name["home_high"]["replay_source_segment"] == "current_lift"
+    assert by_name["target_high_above_return"]["return_strategy"] == safe_transfer.RETURN_STRATEGY_REVERSE_REPLAY
+    assert by_name["home_high"]["return_strategy"] == safe_transfer.RETURN_STRATEGY_REVERSE_REPLAY
+    assert by_name["target_high_above_return"]["replayed_target_ticks"] is True
+    assert by_name["home_high"]["replayed_target_ticks"] is True
+    assert by_name["target_high_above_return"]["ik_status"] == "replayed_forward_target"
+    assert by_name["home_high"]["ik_status"] == "replayed_forward_target"
+    assert by_name["target_high_above_return"]["ik_iterations"] == 0
+    assert by_name["home_high"]["ik_iterations"] == 0
+    assert by_name["target_high_above_return"]["ik_seed_source"] == "not_applicable"
+    assert by_name["home_high"]["ik_seed_source"] == "not_applicable"
+    assert by_name["home_pose"]["target_ticks"] == _home_arm_ticks()
+    assert saved["return_strategy"] == safe_transfer.RETURN_STRATEGY_REVERSE_REPLAY
+    assert saved_by_name["target_high_above_return"]["replay_source_segment"] == "target_high_above"
+    assert saved_by_name["home_high"]["return_strategy"] == safe_transfer.RETURN_STRATEGY_REVERSE_REPLAY
+
+
+
+def test_resolve_new_preserves_return_ik_solving(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    calls = []
+
+    def recording_solver(*args, **kwargs):
+        calls.append(dict(kwargs))
+        return FakeIKResult(args[1])
+
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home", "--return-strategy", safe_transfer.RETURN_STRATEGY_RESOLVE_NEW]),
+        ik_solver=recording_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    assert len(calls) == 5
+    assert by_name["target_high_above_return"]["replayed_target_ticks"] is False
+    assert by_name["home_high"]["replayed_target_ticks"] is False
+    assert by_name["target_high_above_return"]["ik_status"] != "replayed_forward_target"
+    assert by_name["home_high"]["ik_status"] != "replayed_forward_target"
+
+
+
+def test_reverse_replay_still_validates_return_paths(tmpdir, monkeypatch):
+    calls = {"count": 0}
+
+    def counting_path(*args, **kwargs):
+        calls["count"] += 1
+        return _passing_path(*args, **kwargs)
+
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", counting_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home"]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    assert len(log["segments"]) == 6
+    assert calls["count"] == 6
+    assert by_name["target_high_above_return"]["path_validation"]["passed"] is True
+    assert by_name["home_high"]["path_validation"]["passed"] is True
+
+
+
+def test_reverse_replay_path_failure_aborts_before_return_command(tmpdir, monkeypatch):
+    calls = {"count": 0}
+
+    def fourth_segment_fails(*args, **kwargs):
+        calls["count"] += 1
+        summary = _passing_path(*args, **kwargs)
+        if calls["count"] == 4:
+            summary["passed"] = False
+            summary["failure_reason"] = "synthetic replay path failure"
+        return summary
+
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", fourth_segment_fails)
+    bus = FakeBus(update_on_write=True)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home", "--execute", "--confirm", safe_transfer.CONFIRM_TEXT]),
+        bus_factory=_bus_factory(bus),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+        sleep_fn=lambda seconds: None,
+    )
+    assert log["abort_reason"] == "synthetic replay path failure"
+    assert log["segments"][3]["segment_name"] == "target_high_above_return"
+    assert log["segments"][2]["command_sent"] is True
+    assert log["segments"][3]["command_sent"] is False
+
+
+
+def test_reverse_replay_still_checks_motion_deltas(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    calls = {"count": 0}
+
+    def recording_motion_deltas(current_ticks, target_ticks, max_joint_delta_ticks, max_total_l1_delta_ticks, include_gripper):
+        del max_joint_delta_ticks, max_total_l1_delta_ticks, include_gripper
+        calls["count"] += 1
+        deltas = dict((joint, abs(int(target_ticks[joint]) - int(current_ticks[joint]))) for joint in safe_transfer.ARM_JOINTS)
+        checks = []
+        if calls["count"] == 4:
+            checks.append(safe_transfer.make_check("motion_delta_replay", False, "synthetic replay delta failure"))
+        return deltas, checks
+
+    monkeypatch.setattr(safe_transfer, "validate_motion_deltas", recording_motion_deltas)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home"]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert calls["count"] >= 4
+    assert log["abort_reason"] == "synthetic replay delta failure"
+    assert log["segments"][3]["segment_name"] == "target_high_above_return"
+    assert log["segments"][3]["replayed_target_ticks"] is True
+
+
 def test_gripper_is_excluded_from_all_target_ticks(tmpdir, monkeypatch):
     monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
     log = safe_transfer.run_safe_square_transfer(
@@ -397,6 +557,9 @@ def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
         "safety_checks",
         "path_validation",
         "approach_tilt_deg",
+        "return_strategy",
+        "replay_source_segment",
+        "replayed_target_ticks",
         "settle_time_s",
         "command_sent",
         "abort_reason",
@@ -498,7 +661,12 @@ def test_safe_transfer_applies_seed_only_to_square_segments(tmpdir, monkeypatch)
         "wrist_flex": 2200,
         "wrist_roll": 2500,
     })
-    args = _args(tmpdir, ["--square", "a1", "--return-home", "--ik-seed-poses", seed_path])
+    args = _args(tmpdir, [
+        "--square", "a1",
+        "--return-home",
+        "--return-strategy", safe_transfer.RETURN_STRATEGY_RESOLVE_NEW,
+        "--ik-seed-poses", seed_path,
+    ])
     log = safe_transfer.run_safe_square_transfer(
         args,
         ik_solver=recording_solver,

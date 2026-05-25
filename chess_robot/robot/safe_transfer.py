@@ -68,6 +68,8 @@ SQUARE_IK_SEED_SEGMENTS = (
     "target_normal_above",
     "target_high_above_return",
 )
+RETURN_STRATEGY_REVERSE_REPLAY = "reverse_replay"
+RETURN_STRATEGY_RESOLVE_NEW = "resolve_new"
 
 
 class SafeTransferError(RuntimeError):
@@ -125,6 +127,7 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
             args,
         )
 
+        completed_segments = {}
         for segment_index, spec in enumerate(plan, start=1):
             if bool(args.execute):
                 current_ticks = read_current_ticks(bus, servo_ids)
@@ -135,9 +138,11 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
                 current_ticks,
                 context,
                 args,
+                completed_segments=completed_segments,
                 ik_solver=ik_solver,
             )
             log["segments"].append(segment)
+            completed_segments[segment["segment_name"]] = segment
             if segment.get("abort_reason"):
                 set_transfer_abort(log, segment["abort_reason"])
                 break
@@ -176,12 +181,21 @@ def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz,
     ]
     if bool(getattr(args, "return_home", False)):
         plan.extend([
-            make_world_segment("target_high_above_return", [square[0], square[1], high_z]),
-            make_world_segment("home_high", [home[0], home[1], max(float(home[2]), transit_z)]),
+            make_return_world_segment(
+                "target_high_above_return",
+                [square[0], square[1], high_z],
+                "target_high_above",
+            ),
+            make_return_world_segment(
+                "home_high",
+                [home[0], home[1], max(float(home[2]), transit_z)],
+                "current_lift",
+            ),
             {
                 "segment_name": "home_pose",
                 "target_mode": "home_pose",
                 "target_world_xyz_m": [float(value) for value in home],
+                "is_return_segment": True,
             },
         ])
     for segment in plan:
@@ -197,6 +211,13 @@ def make_world_segment(name, values):
     }
 
 
+def make_return_world_segment(name, values, replay_source_segment):
+    segment = make_world_segment(name, values)
+    segment["is_return_segment"] = True
+    segment["replay_source_segment"] = str(replay_source_segment)
+    return segment
+
+
 def segment_uses_approach_preference(spec, args):
     if not bool(getattr(args, "prefer_vertical_approach", False)):
         return False
@@ -209,49 +230,112 @@ def segment_uses_approach_enforcement(spec, args):
     return segment_uses_approach_preference(spec, args)
 
 
-def evaluate_segment(segment_index, spec, current_ticks, context, args, ik_solver=None):
+def resolve_return_replay_source(spec, args):
+    if str(getattr(args, "return_strategy", RETURN_STRATEGY_REVERSE_REPLAY)) != RETURN_STRATEGY_REVERSE_REPLAY:
+        return None
+    replay_source_segment = spec.get("replay_source_segment")
+    if replay_source_segment is None:
+        return None
+    return str(replay_source_segment)
+
+
+def resolve_replayed_target(replay_source_segment, completed_segments, context, execute_mode):
+    source_segment = completed_segments.get(replay_source_segment)
+    if source_segment is None:
+        raise SafeTransferError("Reverse replay source segment was not found: %s" % replay_source_segment)
+
+    target_ticks = arm_ticks_only(source_segment.get("target_ticks") or {})
+    if len(target_ticks) != len(ARM_JOINTS):
+        raise SafeTransferError("Reverse replay source segment has no complete target ticks: %s" % replay_source_segment)
+    if bool(execute_mode) and not bool(source_segment.get("command_sent")):
+        raise SafeTransferError("Reverse replay source segment was not commanded in execute mode: %s" % replay_source_segment)
+
+    final_tcp_robot, final_tcp_world = tcp_from_ticks(context, target_ticks)
+    joint_positions_rad = convert_pose_ticks_to_urdf_radians(target_ticks, context["calibration"])
+    return {
+        "target_ticks": target_ticks,
+        "joint_positions_rad": joint_positions_rad,
+        "final_tcp_robot": final_tcp_robot,
+        "final_tcp_world": final_tcp_world,
+        "result": {
+            "success": bool(source_segment.get("ik_success")),
+            "status": "replayed_forward_target",
+            "error_m": source_segment.get("ik_error_m"),
+            "iterations": 0,
+        },
+    }
+
+
+def evaluate_segment(segment_index, spec, current_ticks, context, args, completed_segments=None, ik_solver=None):
+    completed_segments = completed_segments or {}
     target_world = np.asarray(spec["target_world_xyz_m"], dtype=float)
     target_robot = world_point_to_robot_base(target_world, context["scene_geometry"])
-    current_rad = convert_pose_ticks_to_urdf_radians(current_ticks, context["calibration"])
-    segment_seed = resolve_segment_ik_seed(spec, current_ticks, current_rad, context)
-
     segment = base_segment_log(segment_index, spec, target_world, target_robot, current_ticks)
-    segment["ik_seed_source"] = segment_seed["source"]
-    segment["ik_seed_ticks_used"] = dict((joint, int(segment_seed["ticks_used"][joint])) for joint in segment_seed["ticks_used"])
-    segment["ik_seed_joints_used"] = list(segment_seed["joints_used"])
+    if bool(spec.get("is_return_segment")):
+        segment["return_strategy"] = str(getattr(args, "return_strategy", RETURN_STRATEGY_REVERSE_REPLAY))
+    replay_source_segment = resolve_return_replay_source(spec, args)
     try:
-        if spec.get("target_mode") == "home_pose":
-            result = build_home_pose_ik_result(context, target_robot)
-            target_ticks = arm_ticks_only(context["home_pose_ticks"])
-        else:
-            solver_context = dict(context)
-            solver_context["home_seed"] = dict(segment_seed["joint_positions_rad"])
-            segment_prefer = segment_uses_approach_preference(spec, args)
-            segment_enforce = segment_uses_approach_enforcement(spec, args)
-            result = solve_single_target_ik(
-                solver_context,
-                target_robot,
-                args,
-                ik_solver=ik_solver,
-                square=getattr(args, "square", None),
-                prefer_vertical_approach=segment_prefer,
-                enforce_approach_angle=segment_enforce,
+        if replay_source_segment is not None:
+            replay = resolve_replayed_target(
+                replay_source_segment,
+                completed_segments,
+                context,
+                bool(args.execute),
             )
-            target_ticks = joint_angles_to_ticks(result.joint_positions_rad, context["calibration"])
+            target_ticks = replay["target_ticks"]
+            joint_positions_rad = replay["joint_positions_rad"]
+            segment["ik_seed_source"] = "not_applicable"
+            segment["ik_seed_ticks_used"] = {}
+            segment["ik_seed_joints_used"] = []
+            segment.update({
+                "ik_success": bool(replay["result"]["success"]),
+                "ik_status": str(replay["result"]["status"]),
+                "ik_error_m": None if replay["result"]["error_m"] is None else float(replay["result"]["error_m"]),
+                "ik_iterations": int(replay["result"]["iterations"]),
+                "final_tcp_world_xyz_m": xyz_list(replay["final_tcp_world"]),
+                "final_tcp_robot_xyz_m": xyz_list(replay["final_tcp_robot"]),
+                "target_ticks": dict((joint, int(target_ticks[joint])) for joint in target_ticks),
+                "replayed_target_ticks": True,
+            })
+        else:
+            current_rad = convert_pose_ticks_to_urdf_radians(current_ticks, context["calibration"])
+            segment_seed = resolve_segment_ik_seed(spec, current_ticks, current_rad, context)
+            segment["ik_seed_source"] = segment_seed["source"]
+            segment["ik_seed_ticks_used"] = dict((joint, int(segment_seed["ticks_used"][joint])) for joint in segment_seed["ticks_used"])
+            segment["ik_seed_joints_used"] = list(segment_seed["joints_used"])
+            if spec.get("target_mode") == "home_pose":
+                result = build_home_pose_ik_result(context, target_robot)
+                target_ticks = arm_ticks_only(context["home_pose_ticks"])
+            else:
+                solver_context = dict(context)
+                solver_context["home_seed"] = dict(segment_seed["joint_positions_rad"])
+                segment_prefer = segment_uses_approach_preference(spec, args)
+                segment_enforce = segment_uses_approach_enforcement(spec, args)
+                result = solve_single_target_ik(
+                    solver_context,
+                    target_robot,
+                    args,
+                    ik_solver=ik_solver,
+                    square=getattr(args, "square", None),
+                    prefer_vertical_approach=segment_prefer,
+                    enforce_approach_angle=segment_enforce,
+                )
+                target_ticks = joint_angles_to_ticks(result.joint_positions_rad, context["calibration"])
 
-        final_tcp_world = robot_base_point_to_world(result.final_xyz_robot, context["scene_geometry"])
-        segment.update({
-            "ik_success": bool(result.success),
-            "ik_status": str(result.status),
-            "ik_error_m": float(result.error_m),
-            "ik_iterations": int(result.iterations),
-            "final_tcp_world_xyz_m": xyz_list(final_tcp_world),
-            "final_tcp_robot_xyz_m": xyz_list(result.final_xyz_robot),
-            "target_ticks": dict((joint, int(target_ticks[joint])) for joint in target_ticks),
-        })
+            joint_positions_rad = result.joint_positions_rad
+            final_tcp_world = robot_base_point_to_world(result.final_xyz_robot, context["scene_geometry"])
+            segment.update({
+                "ik_success": bool(result.success),
+                "ik_status": str(result.status),
+                "ik_error_m": float(result.error_m),
+                "ik_iterations": int(result.iterations),
+                "final_tcp_world_xyz_m": xyz_list(final_tcp_world),
+                "final_tcp_robot_xyz_m": xyz_list(result.final_xyz_robot),
+                "target_ticks": dict((joint, int(target_ticks[joint])) for joint in target_ticks),
+            })
 
         safety_checks = build_static_safety_checks(
-            bool(result.success),
+            bool(segment["ik_success"]),
             target_ticks,
             context["joint_safety_limits"],
         )
@@ -272,12 +356,14 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, ik_solve
             path_validation.get("failure_reason") or "Board-clearance path validation failed.",
         ))
         segment["safety_checks"] = safety_checks
-        attach_approach_diagnostics(segment, context, args, result.joint_positions_rad, getattr(args, "square", None), segment_uses_approach_preference(spec, args), segment_uses_approach_enforcement(spec, args))
+        attach_approach_diagnostics(segment, context, args, joint_positions_rad, getattr(args, "square", None), segment_uses_approach_preference(spec, args), segment_uses_approach_enforcement(spec, args))
 
         if segment.get("approach_enforced") and not bool(segment.get("approach_angle_check", {}).get("passed")):
             segment["abort_reason"] = segment.get("approach_angle_check", {}).get("failure_reason")
-        elif not bool(result.success):
-            segment["abort_reason"] = "IK failed: %s" % result.status
+        elif replay_source_segment is None and not bool(segment["ik_success"]):
+            segment["abort_reason"] = "IK failed: %s" % segment["ik_status"]
+        elif replay_source_segment is not None and not bool(segment["ik_success"]):
+            segment["abort_reason"] = "Reverse replay source IK was not successful: %s" % replay_source_segment
         elif not all_checks_ok(safety_checks):
             segment["abort_reason"] = first_failed_check_reason(safety_checks)
     except Exception as exc:
@@ -391,6 +477,9 @@ def base_segment_log(segment_index, spec, target_world, target_robot, current_ti
         "ik_seed_source": None,
         "ik_seed_ticks_used": {},
         "ik_seed_joints_used": [],
+        "return_strategy": str(spec.get("return_strategy")) if spec.get("return_strategy") is not None else None,
+        "replay_source_segment": spec.get("replay_source_segment"),
+        "replayed_target_ticks": False,
         "settle_time_s": float(spec["settle_time_s"]),
         "command_sent": False,
         "abort_reason": None,
@@ -431,6 +520,8 @@ def build_transfer_log(args, context, timestamp, mode, board_top):
         "transit_clearance_m": float(args.transit_clearance_m),
         "normal_above_offset_m": float(args.normal_above_offset_m),
         "high_above_offset_m": float(args.high_above_offset_m),
+        "return_home": bool(getattr(args, "return_home", False)),
+        "return_strategy": str(getattr(args, "return_strategy", RETURN_STRATEGY_REVERSE_REPLAY)),
         "command_sent_any": False,
         "aborted": False,
         "abort_reason": None,
