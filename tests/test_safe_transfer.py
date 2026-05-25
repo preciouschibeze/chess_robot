@@ -15,6 +15,7 @@ if TOOLS_ROOT not in sys.path:
     sys.path.insert(0, TOOLS_ROOT)
 
 from chess_robot.robot import safe_transfer
+from chess_robot.robot.ik_seed_poses import default_ik_seed_poses_document
 from chess_robot.robot.ik_validation import ARM_JOINTS
 from chess_robot.robot.joint_calibration import convert_pose_ticks_to_urdf_radians
 from chess_robot.robot.joint_calibration import load_joint_calibration
@@ -110,6 +111,22 @@ def _passing_path(*args, **kwargs):
         "current_tcp_world_xyz_m": [0.0, 0.0, low_zone + 0.050],
         "target_tcp_world_xyz_m": [0.01, 0.0, low_zone + 0.050],
     }
+
+
+def _write_seed_file(path, document):
+    import yaml
+
+    with open(path, "w") as handle:
+        yaml.safe_dump(document, handle, default_flow_style=False)
+
+
+def _seed_path(tmpdir, square, seed_ticks):
+    path = os.path.join(str(tmpdir), "%s_ik_seed_poses.yaml" % square)
+    document = default_ik_seed_poses_document()
+    document["ik_seed_poses"]["squares"].setdefault(square, {"notes": None, "seed_ticks": {}})
+    document["ik_seed_poses"]["squares"][square]["seed_ticks"] = dict(seed_ticks)
+    _write_seed_file(path, document)
+    return path
 
 
 class FakeBus(object):
@@ -463,3 +480,101 @@ def test_policy_resolved_json_is_saved_for_safe_transfer(tmpdir, monkeypatch):
     assert saved["resolved_policy"]["approach_weight"] == 0.02
     assert saved["resolved_policy"]["lock_wrist_roll_home"] is True
     assert log["command_sent_any"] is False
+
+
+def test_safe_transfer_applies_seed_only_to_square_segments(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    calls = []
+
+    def recording_solver(*args, **kwargs):
+        seed = dict(kwargs["home_joint_positions_rad"])
+        calls.append(seed)
+        return FakeIKResult(args[1], joint_positions_rad=seed)
+
+    seed_path = _seed_path(tmpdir, "a1", {
+        "shoulder_pan": 1500,
+        "shoulder_lift": 2000,
+        "elbow_flex": 2500,
+        "wrist_flex": 2200,
+        "wrist_roll": 2500,
+    })
+    args = _args(tmpdir, ["--square", "a1", "--return-home", "--ik-seed-poses", seed_path])
+    log = safe_transfer.run_safe_square_transfer(
+        args,
+        ik_solver=recording_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    assert by_name["current_lift"]["ik_seed_source"] == "current_state"
+    assert by_name["target_high_above"]["ik_seed_source"] == "square_seed_pose"
+    assert by_name["target_normal_above"]["ik_seed_source"] == "square_seed_pose"
+    assert by_name["target_high_above_return"]["ik_seed_source"] == "square_seed_pose"
+    assert by_name["home_high"]["ik_seed_source"] == "current_state"
+    assert by_name["home_pose"]["ik_seed_source"] == "not_applicable"
+    assert by_name["target_high_above"]["ik_seed_ticks_used"]["wrist_roll"] == _home_ticks()["wrist_roll"]
+    assert log["ik_seed_applied"] is True
+    assert calls[1]["shoulder_pan"] != calls[0]["shoulder_pan"]
+    assert calls[2]["shoulder_pan"] == calls[1]["shoulder_pan"]
+    assert calls[4]["shoulder_pan"] == calls[3]["shoulder_pan"]
+
+
+def test_home_pose_does_not_use_square_seed(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    seed_path = _seed_path(tmpdir, "a1", {
+        "shoulder_pan": 1500,
+        "shoulder_lift": 2000,
+        "elbow_flex": 2500,
+        "wrist_flex": 2200,
+        "wrist_roll": 2500,
+    })
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--square", "a1", "--return-home", "--ik-seed-poses", seed_path]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    home_pose_segment = [segment for segment in log["segments"] if segment["segment_name"] == "home_pose"][0]
+    assert home_pose_segment["ik_seed_source"] == "not_applicable"
+    assert home_pose_segment["ik_seed_ticks_used"] == {}
+    assert home_pose_segment["ik_seed_joints_used"] == []
+
+
+def test_no_seed_preserves_current_behavior(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    seed_path = _seed_path(tmpdir, "a1", {})
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--square", "a1", "--ik-seed-poses", seed_path]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert log["ik_seed_applied"] is False
+    assert [segment["ik_seed_source"] for segment in log["segments"]] == [
+        "current_state",
+        "current_state",
+        "current_state",
+    ]
+
+
+def test_output_json_contains_ik_seed_metadata(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    seed_path = _seed_path(tmpdir, "a1", {
+        "shoulder_pan": 1500,
+        "shoulder_lift": 2000,
+        "elbow_flex": 2500,
+        "wrist_flex": 2200,
+        "wrist_roll": 2500,
+    })
+    args = _args(tmpdir, ["--square", "a1", "--ik-seed-poses", seed_path])
+    log = safe_transfer.run_safe_square_transfer(
+        args,
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    with open(args.output, "r") as handle:
+        saved = json.load(handle)
+    assert saved["ik_seed_poses_path"] == seed_path
+    assert saved["ik_seed_square"] == "a1"
+    assert saved["ik_seed_applied"] is True
+    assert saved["ik_seed_notes"]
+    assert saved["segments"][1]["ik_seed_source"] == "square_seed_pose"
+    assert "wrist_roll" in saved["segments"][1]["ik_seed_joints_used"]
+    assert log["segments"][1]["ik_seed_ticks_used"]["wrist_roll"] == _home_ticks()["wrist_roll"]

@@ -33,6 +33,9 @@ from chess_robot.robot.ik_validation import utc_timestamp
 from chess_robot.robot.ik_validation import validate_eeprom_limits_if_available
 from chess_robot.robot.ik_validation import validate_motion_deltas
 from chess_robot.robot.ik_validation import validate_readback
+from chess_robot.robot.ik_seed_poses import apply_locked_joint_overrides
+from chess_robot.robot.ik_seed_poses import load_ik_seed_poses
+from chess_robot.robot.ik_seed_poses import prepare_square_ik_seed
 from chess_robot.robot.joint_calibration import convert_pose_ticks_to_urdf_radians
 from chess_robot.robot.motion_safety import approach_axis_world
 from chess_robot.robot.motion_safety import approach_tilt_deg
@@ -60,6 +63,11 @@ CSV_FIELDNAMES = (
     "min_path_z_m",
     "board_clearance_m",
 )
+SQUARE_IK_SEED_SEGMENTS = (
+    "target_high_above",
+    "target_normal_above",
+    "target_high_above_return",
+)
 
 
 class SafeTransferError(RuntimeError):
@@ -81,6 +89,8 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
     square_world = square_center_world(context["scene_geometry"], args.square)
 
     log = build_transfer_log(args, context, timestamp, mode, board_top)
+    context["square_ik_seed"] = load_square_ik_seed_context(args, context)
+    attach_square_ik_seed_log_metadata(log, context["square_ik_seed"])
 
     if bool(getattr(args, "start_from_readback", False)) and not bool(args.execute):
         set_transfer_abort(log, "--start-from-readback is only valid with --execute.")
@@ -203,15 +213,19 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, ik_solve
     target_world = np.asarray(spec["target_world_xyz_m"], dtype=float)
     target_robot = world_point_to_robot_base(target_world, context["scene_geometry"])
     current_rad = convert_pose_ticks_to_urdf_radians(current_ticks, context["calibration"])
+    segment_seed = resolve_segment_ik_seed(spec, current_ticks, current_rad, context)
 
     segment = base_segment_log(segment_index, spec, target_world, target_robot, current_ticks)
+    segment["ik_seed_source"] = segment_seed["source"]
+    segment["ik_seed_ticks_used"] = dict((joint, int(segment_seed["ticks_used"][joint])) for joint in segment_seed["ticks_used"])
+    segment["ik_seed_joints_used"] = list(segment_seed["joints_used"])
     try:
         if spec.get("target_mode") == "home_pose":
             result = build_home_pose_ik_result(context, target_robot)
             target_ticks = arm_ticks_only(context["home_pose_ticks"])
         else:
             solver_context = dict(context)
-            solver_context["home_seed"] = current_rad
+            solver_context["home_seed"] = dict(segment_seed["joint_positions_rad"])
             segment_prefer = segment_uses_approach_preference(spec, args)
             segment_enforce = segment_uses_approach_enforcement(spec, args)
             result = solve_single_target_ik(
@@ -374,6 +388,9 @@ def base_segment_log(segment_index, spec, target_world, target_robot, current_ti
         "best_candidate_axis_local": None,
         "best_candidate_axis_world": None,
         "best_candidate_axis_tilt_deg": None,
+        "ik_seed_source": None,
+        "ik_seed_ticks_used": {},
+        "ik_seed_joints_used": [],
         "settle_time_s": float(spec["settle_time_s"]),
         "command_sent": False,
         "abort_reason": None,
@@ -403,6 +420,10 @@ def build_transfer_log(args, context, timestamp, mode, board_top):
         "approach_policy_square": getattr(args, "approach_policy_square", None),
         "resolved_policy": resolved_policy,
         "policy_override_applied": bool(getattr(args, "policy_override_applied", False)),
+        "ik_seed_poses_path": getattr(args, "ik_seed_poses", None),
+        "ik_seed_square": None,
+        "ik_seed_applied": False,
+        "ik_seed_notes": [],
         "locked_joints": dict((joint, int(value)) for joint, value in locked_ticks.items()),
         "locked_joint_sources": dict((joint, str(value)) for joint, value in (context.get("locked_joint_sources") or {}).items()),
         "board_top_z_m": float(board_top),
@@ -511,3 +532,77 @@ def square_center_world(scene_geometry, square):
 def xyz_list(values):
     array = np.asarray(values, dtype=float)
     return [float(array[0]), float(array[1]), float(array[2])]
+
+
+def load_square_ik_seed_context(args, context):
+    info = {
+        "path": getattr(args, "ik_seed_poses", None),
+        "square": None,
+        "seed_applied": False,
+        "notes": [],
+        "seed_ticks": {},
+        "seed_ticks_used": {},
+        "seed_positions_rad_used": {},
+        "seed_joints_used": [],
+    }
+    if not getattr(args, "ik_seed_poses", None):
+        return info
+    if bool(getattr(args, "ignore_ik_seed_poses", False)):
+        return info
+
+    document = load_ik_seed_poses(args.ik_seed_poses)
+    seed_info = prepare_square_ik_seed(
+        document,
+        getattr(args, "square", None),
+        context["calibration"],
+        context["joint_safety_limits"],
+        context.get("locked_joint_positions_rad"),
+        context.get("locked_joint_ticks"),
+    )
+    info.update(seed_info)
+    return info
+
+
+def attach_square_ik_seed_log_metadata(log, square_ik_seed):
+    if square_ik_seed is None:
+        return log
+    log["ik_seed_poses_path"] = square_ik_seed.get("path")
+    log["ik_seed_square"] = square_ik_seed.get("square")
+    log["ik_seed_applied"] = bool(square_ik_seed.get("seed_applied"))
+    log["ik_seed_notes"] = list(square_ik_seed.get("notes") or [])
+    return log
+
+
+def resolve_segment_ik_seed(spec, current_ticks, current_rad, context):
+    segment_name = str(spec.get("segment_name") or "")
+    if spec.get("target_mode") == "home_pose":
+        return {
+            "source": "not_applicable",
+            "ticks_used": {},
+            "joints_used": [],
+            "joint_positions_rad": {},
+        }
+
+    seed_ticks = arm_ticks_only(current_ticks)
+    seed_positions_rad = dict((joint_name, float(current_rad[joint_name])) for joint_name in current_rad)
+    source = "current_state"
+
+    square_ik_seed = context.get("square_ik_seed") or {}
+    if segment_name in SQUARE_IK_SEED_SEGMENTS and bool(square_ik_seed.get("seed_applied")):
+        source = "square_seed_pose"
+        seed_ticks = dict((joint_name, int(square_ik_seed["seed_ticks_used"][joint_name])) for joint_name in square_ik_seed.get("seed_ticks_used", {}))
+        seed_positions_rad = dict((joint_name, float(square_ik_seed["seed_positions_rad_used"][joint_name])) for joint_name in square_ik_seed.get("seed_positions_rad_used", {}))
+    else:
+        seed_ticks, seed_positions_rad = apply_locked_joint_overrides(
+            seed_ticks,
+            seed_positions_rad,
+            context.get("locked_joint_positions_rad"),
+            context.get("locked_joint_ticks"),
+        )
+
+    return {
+        "source": source,
+        "ticks_used": seed_ticks,
+        "joints_used": [joint_name for joint_name in ARM_JOINTS if joint_name in seed_ticks],
+        "joint_positions_rad": seed_positions_rad,
+    }

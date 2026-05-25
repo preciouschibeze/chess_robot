@@ -30,6 +30,7 @@ DEFAULT_JOINT_SAFETY_LIMITS_PATH = os.path.join(REPO_ROOT, "data", "calibration"
 DEFAULT_HOME_POSE_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "home_pose.yaml")
 DEFAULT_TOOL_FRAMES_PATH = os.path.join(REPO_ROOT, "data", "calibration", "gripper", "tool_frames.yaml")
 DEFAULT_APPROACH_POLICY_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "approach_policy.yaml")
+DEFAULT_IK_SEED_POSES_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "ik_seed_poses.yaml")
 
 
 class PolicyAwareArgumentParser(argparse.ArgumentParser):
@@ -78,6 +79,8 @@ def build_parser():
     parser.add_argument("--csv-log", default=DEFAULT_CSV_LOG_PATH, help="CSV summary append path.")
     parser.add_argument("--square", required=True, help="Board square target, for example e4.")
     parser.add_argument("--approach-policy", default=None, help="Approach policy YAML path, for example %s." % DEFAULT_APPROACH_POLICY_PATH)
+    parser.add_argument("--ik-seed-poses", default=None, help="IK seed pose YAML path, for example %s." % DEFAULT_IK_SEED_POSES_PATH)
+    parser.add_argument("--ignore-ik-seed-poses", action="store_true", help="Ignore square-specific IK seed poses and preserve current seeding behaviour.")
 
     parser.add_argument("--normal-above-offset-m", type=float, default=0.080, help="Normal above-square height above board top.")
     parser.add_argument("--high-above-offset-m", type=float, default=0.120, help="High above-square height above board top.")
@@ -136,6 +139,11 @@ def print_report(log, output_path):
     print("Approach policy path: %s" % (log.get("approach_policy_path") or "none"))
     print("Approach policy square: %s" % (log.get("approach_policy_square") or "none"))
     print("Policy override applied: %s" % bool(log.get("policy_override_applied", False)))
+    print("IK seed poses path: %s" % (log.get("ik_seed_poses_path") or "none"))
+    print("IK seed square: %s" % (log.get("ik_seed_square") or "none"))
+    print("IK seed applied: %s" % bool(log.get("ik_seed_applied", False)))
+    if log.get("ik_seed_notes"):
+        print("IK seed notes: %s" % json.dumps(log.get("ik_seed_notes"), sort_keys=False))
     if log.get("resolved_policy") is not None:
         print("Resolved policy: %s" % json.dumps(log["resolved_policy"], sort_keys=True))
     if log.get("locked_joints"):
@@ -144,7 +152,7 @@ def print_report(log, output_path):
     for segment in log.get("segments", []):
         path = segment.get("path_validation") or {}
         print(
-            "  %d. %s ik=%s path=%s tilt=%s min_z=%s settle=%s command=%s abort=%s"
+            "  %d. %s ik=%s path=%s tilt=%s min_z=%s settle=%s seed=%s command=%s abort=%s"
             % (
                 int(segment["segment_index"]),
                 segment["segment_name"],
@@ -153,6 +161,7 @@ def print_report(log, output_path):
                 format_optional_float(segment.get("approach_tilt_deg")),
                 format_optional_float(path.get("min_z_m")),
                 format_optional_float(segment.get("settle_time_s")),
+                segment.get("ik_seed_source"),
                 segment.get("command_sent"),
                 segment.get("abort_reason") or "",
             )

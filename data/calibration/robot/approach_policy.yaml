@@ -1,27 +1,44 @@
 approach_policy:
   version: 1
+
   default:
     prefer_vertical_approach: true
     enforce_approach_angle: false
     approach_axis_name: plus_z
     approach_weight: 0.05
+
     max_approach_tilt_deg: 20.0
     max_edge_approach_tilt_deg: 30.0
+
     normal_above_offset_m: 0.080
     high_above_offset_m: 0.120
     transit_clearance_m: 0.120
+
+    # This is clearance above the board surface, not world Z.
+    # Board top is about 0.026 m, so this gives low_zone_z ≈ 0.086 m.
+    # Keep at 0.060 for gameplay because tallest piece is about 0.054 m.
     board_clearance_m: 0.060
+
     lock_wrist_roll_home: true
+
   overrides:
     a1:
       approach_weight: 0.02
+      high_above_offset_m: 0.140
+      transit_clearance_m: 0.140
       enforce_approach_angle: false
-      notes: "Far-rank corner; relaxed vertical approach required."
+      notes: "Far-rank corner; relaxed vertical approach and higher transit height required."
+
     b1:
       approach_weight: 0.02
+      high_above_offset_m: 0.140
+      transit_clearance_m: 0.140
       enforce_approach_angle: false
-      notes: "Far-rank square; relaxed vertical approach required."
+      notes: "Far-rank square; relaxed vertical approach and higher transit height required."
+
     h1:
       approach_weight: 0.02
+      high_above_offset_m: 0.140
+      transit_clearance_m: 0.140
       enforce_approach_angle: false
-      notes: "Far-rank corner; relaxed vertical approach required."
+      notes: "Far-rank corner; relaxed vertical approach and higher transit height required."
