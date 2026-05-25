@@ -454,3 +454,58 @@ def test_zplus10_offset_changes_target_world_z_by_exactly_10mm(tmpdir):
     )
     dz = log["target_world_xyz_m"][2] - log["saved_home_tcp_world_xyz_m"][2]
     assert abs(dz - 0.010) < 1.0e-12
+
+
+def _synthetic_failed_approach_report(*args, **kwargs):
+    del args, kwargs
+    return {
+        "approach_axis_local": [0.0, 0.0, -1.0],
+        "approach_axis_name": "minus_z",
+        "approach_axis_source": "tool_frame",
+        "approach_axis_local_defaulted": False,
+        "approach_axis_local_warning": None,
+        "approach_axis_world": [1.0, 0.0, 0.0],
+        "approach_tilt_deg": 90.0,
+        "approach_target_world_axis": [0.0, 0.0, -1.0],
+        "approach_weight": 0.05,
+        "approach_preferred": True,
+        "approach_enforced": True,
+        "approach_angle_check": {
+            "passed": False,
+            "tilt_deg": 90.0,
+            "max_tilt_deg": 10.0,
+            "failure_reason": "synthetic tilt failure",
+            "enforced": True,
+            "preferred": True,
+        },
+        "selected_approach_tilt_limit_deg": 10.0,
+        "max_approach_tilt_deg": 10.0,
+        "max_edge_approach_tilt_deg": 20.0,
+        "best_candidate_axis_name": "plus_x",
+        "best_candidate_axis_local": [1.0, 0.0, 0.0],
+        "best_candidate_axis_world": [0.0, 0.0, -1.0],
+        "best_candidate_axis_tilt_deg": 0.0,
+    }
+
+
+def test_enforce_approach_angle_aborts_when_failed_report_is_returned(tmpdir, monkeypatch):
+    monkeypatch.setattr(ik_validation, "build_approach_report", _synthetic_failed_approach_report)
+    args = _args(tmpdir, ["--prefer-vertical-approach", "--enforce-approach-angle"])
+    log = ik_validation.run_single_pose_validation(
+        args,
+        ik_solver=lambda *a, **k: FakeIKResult(success=True),
+        now_fn=lambda: "2026-05-24T00:00:00Z",
+    )
+    assert log["abort_reason"] == "synthetic tilt failure"
+
+
+def test_prefer_only_mode_reports_failed_approach_check_without_aborting(tmpdir, monkeypatch):
+    monkeypatch.setattr(ik_validation, "build_approach_report", _synthetic_failed_approach_report)
+    args = _args(tmpdir, ["--prefer-vertical-approach"])
+    log = ik_validation.run_single_pose_validation(
+        args,
+        ik_solver=lambda *a, **k: FakeIKResult(success=True),
+        now_fn=lambda: "2026-05-24T00:00:00Z",
+    )
+    assert log["approach_angle_check"]["passed"] is False
+    assert log["abort_reason"] is None

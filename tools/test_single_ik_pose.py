@@ -58,9 +58,13 @@ def build_parser():
     parser.set_defaults(enforce_board_clearance=None)
     parser.add_argument("--enforce-board-clearance", dest="enforce_board_clearance", action="store_true", help="Enforce board-clearance path validation. Defaults true in execute mode.")
     parser.add_argument("--no-enforce-board-clearance", dest="enforce_board_clearance", action="store_false", help="Report but do not enforce board-clearance validation.")
-    parser.add_argument("--max-approach-tilt-deg", type=float, default=15.0, help="Maximum allowed approach-axis tilt from world down.")
-    parser.add_argument("--max-edge-approach-tilt-deg", type=float, default=25.0, help="Maximum allowed approach-axis tilt for edge squares.")
-    parser.add_argument("--enforce-approach-angle", action="store_true", help="Abort execute mode if final approach angle exceeds the configured tilt limit.")
+    parser.add_argument("--prefer-vertical-approach", action="store_true", help="Prefer a vertical world-down tool approach during IK solve.")
+    parser.add_argument("--approach-axis-name", choices=("plus_x", "minus_x", "plus_y", "minus_y", "plus_z", "minus_z"), help="Named local tool axis to treat as the approach direction.")
+    parser.add_argument("--approach-axis-local", nargs=3, type=float, help="Explicit local tool approach axis XYZ.")
+    parser.add_argument("--max-approach-tilt-deg", type=float, default=10.0, help="Maximum allowed approach-axis tilt from world down.")
+    parser.add_argument("--max-edge-approach-tilt-deg", type=float, default=20.0, help="Maximum allowed approach-axis tilt for edge squares.")
+    parser.add_argument("--approach-weight", type=float, default=0.05, help="Residual weight for vertical-approach preference in IK.")
+    parser.add_argument("--enforce-approach-angle", action="store_true", help="Abort when final approach angle exceeds the configured tilt limit.")
 
     parser.add_argument(
         "--limit-source",
@@ -150,12 +154,14 @@ def print_report(log, output_path):
         print("Path validation note: approximate joint-space FK safety gate, not a full collision checker.")
     if log.get("approach_axis_world") is not None:
         print("Approach axis local: %s" % format_xyz(log["approach_axis_local"]))
+        print("Approach axis name: %s source=%s" % (log.get("approach_axis_name"), log.get("approach_axis_source")))
         print("Approach axis world: %s" % format_xyz(log["approach_axis_world"]))
         print("Approach tilt: %.3f deg (limit %.3f deg, passed=%s)" % (
             float(log.get("approach_tilt_deg")),
             float(log.get("max_approach_tilt_deg")),
             log.get("approach_angle_check", {}).get("passed"),
         ))
+        print("Best candidate axis: %s tilt=%.3f deg" % (log.get("best_candidate_axis_name"), float(log.get("best_candidate_axis_tilt_deg"))))
         if log.get("approach_axis_local_warning"):
             print("Approach axis warning: %s" % log.get("approach_axis_local_warning"))
     if log.get("abort_reason"):

@@ -4,12 +4,17 @@ import math
 
 import numpy as np
 
+from chess_robot.robot.approach_orientation import approach_tilt_deg
+from chess_robot.robot.approach_orientation import axis_name_from_vector
+from chess_robot.robot.approach_orientation import make_approach_angle_check
+from chess_robot.robot.approach_orientation import normalize_vector
 from chess_robot.robot.jacobian import compute_position_jacobian
 from chess_robot.robot.tool_frames import compute_tcp_transform
 from chess_robot.robot.tool_frames import describe_tool_frame
 from chess_robot.robot.urdf_model import DEFAULT_END_LINK
 
 LIMIT_HIT_TOLERANCE_RAD = 1e-6
+FINITE_DIFFERENCE_STEP_RAD = 1e-5
 
 
 class IKResult(object):
@@ -39,6 +44,15 @@ class IKResult(object):
             "joint_names": list(self.joint_names),
             "optimized_joint_names": list(self.optimized_joint_names),
             "locked_joints_rad": _mapping_to_float_dict(self.locked_joints_rad),
+            "approach_axis_local": _optional_array_to_list(getattr(self, "approach_axis_local", None)),
+            "approach_axis_name": getattr(self, "approach_axis_name", None),
+            "approach_target_axis": _optional_array_to_list(getattr(self, "approach_target_axis", None)),
+            "approach_tilt_deg": _optional_float(getattr(self, "approach_tilt_deg", None)),
+            "approach_weight": _optional_float(getattr(self, "approach_weight", None)),
+            "approach_preferred": bool(getattr(self, "approach_preferred", False)),
+            "approach_enforced": bool(getattr(self, "approach_enforced", False)),
+            "selected_approach_tilt_limit_deg": _optional_float(getattr(self, "selected_approach_tilt_limit_deg", None)),
+            "approach_angle_check": getattr(self, "approach_angle_check", None),
         }
 
 
@@ -172,6 +186,185 @@ def solve_position_ik(
     )
 
 
+def solve_position_ik_with_approach(
+    model,
+    target_xyz_robot,
+    seed_joint_positions_rad,
+    joint_limits_rad,
+    end_link=DEFAULT_END_LINK,
+    tool_frame=None,
+    max_iters=200,
+    tolerance_m=0.005,
+    damping=0.05,
+    step_scale=1.0,
+    locked_joint_positions_rad=None,
+    approach_axis_local=None,
+    approach_target_axis=None,
+    approach_weight=0.05,
+    enforce_approach_angle=False,
+    selected_approach_tilt_limit_deg=None,
+    approach_axis_name=None,
+):
+    target_xyz_robot = _as_xyz(target_xyz_robot, "target_xyz_robot")
+    max_iters = int(max_iters)
+    tolerance_m = float(tolerance_m)
+    damping = float(damping)
+    step_scale = float(step_scale)
+    approach_weight = float(approach_weight)
+    if max_iters <= 0:
+        raise ValueError("max_iters must be positive.")
+    if tolerance_m < 0.0:
+        raise ValueError("tolerance_m must be non-negative.")
+    if damping < 0.0:
+        raise ValueError("damping must be non-negative.")
+    if step_scale <= 0.0:
+        raise ValueError("step_scale must be greater than zero.")
+    if approach_weight < 0.0:
+        raise ValueError("approach_weight must be non-negative.")
+    if approach_axis_local is None:
+        raise ValueError("approach_axis_local is required for orientation-constrained IK.")
+    if approach_target_axis is None:
+        raise ValueError("approach_target_axis is required for orientation-constrained IK.")
+
+    approach_axis_local = normalize_vector(approach_axis_local, "approach_axis_local")
+    approach_target_axis = normalize_vector(approach_target_axis, "approach_target_axis")
+    if selected_approach_tilt_limit_deg is None:
+        selected_approach_tilt_limit_deg = 180.0
+    selected_approach_tilt_limit_deg = float(selected_approach_tilt_limit_deg)
+
+    joint_names, lower_limits, upper_limits = _normalise_joint_limits(
+        model,
+        joint_limits_rad,
+        end_link=end_link,
+    )
+    joint_vector = _joint_vector_from_input(seed_joint_positions_rad, joint_names)
+    joint_vector = np.clip(joint_vector, lower_limits, upper_limits)
+    locked_joint_positions_rad = _normalise_locked_joint_positions(
+        locked_joint_positions_rad,
+        joint_names,
+    )
+    active_joint_indices = [
+        joint_index
+        for joint_index in range(len(joint_names))
+        if joint_names[joint_index] not in locked_joint_positions_rad
+    ]
+    joint_vector = _apply_locked_joint_positions(joint_vector, joint_names, locked_joint_positions_rad)
+
+    status = "max_iters"
+    success = False
+    final_xyz_robot = None
+    error_xyz_robot = None
+    approach_axis_current = None
+    approach_tilt_current_deg = None
+    approach_angle_check = None
+    iterations = 0
+
+    for iteration in range(max_iters + 1):
+        joint_map = _joint_map_from_vector(joint_names, joint_vector)
+        tcp_transform = compute_tcp_transform(
+            model,
+            joint_map,
+            end_link=end_link,
+            tool_frame=tool_frame,
+        )
+        final_xyz_robot = tcp_transform[:3, 3].copy()
+        approach_axis_current = normalize_vector(
+            np.dot(tcp_transform[:3, :3], approach_axis_local),
+            "approach_axis_robot",
+        )
+        error_xyz_robot = target_xyz_robot - final_xyz_robot
+        axis_error = approach_target_axis - approach_axis_current
+        error_m = float(np.linalg.norm(error_xyz_robot))
+        approach_tilt_current_deg = approach_tilt_deg(
+            approach_axis_current,
+            reference_down_axis=approach_target_axis,
+        )
+        approach_angle_check = make_approach_angle_check(
+            approach_tilt_current_deg,
+            selected_approach_tilt_limit_deg,
+        )
+        iterations = iteration
+
+        if error_m <= tolerance_m and (not bool(enforce_approach_angle) or bool(approach_angle_check["passed"])):
+            success = True
+            status = "success"
+            break
+        if iteration >= max_iters:
+            break
+        if not active_joint_indices:
+            status = "locked_joints_fixed"
+            break
+
+        residual = np.concatenate((error_xyz_robot, approach_weight * axis_error))
+        active_jacobian = _finite_difference_combined_jacobian(
+            model,
+            joint_names,
+            joint_vector,
+            active_joint_indices,
+            end_link,
+            tool_frame,
+            approach_axis_local,
+            final_xyz_robot,
+            approach_axis_current,
+        )
+        active_jacobian[3:, :] = approach_weight * active_jacobian[3:, :]
+        damp_matrix = np.dot(active_jacobian, active_jacobian.T) + ((damping ** 2) * np.eye(active_jacobian.shape[0], dtype=float))
+        delta_q = np.dot(active_jacobian.T, np.linalg.solve(damp_matrix, residual))
+        if not np.isfinite(delta_q).all():
+            status = "non_finite_step"
+            break
+        updated_joint_vector = np.asarray(joint_vector, dtype=float).copy()
+        for delta_index, joint_index in enumerate(active_joint_indices):
+            updated_joint_vector[joint_index] = updated_joint_vector[joint_index] + (step_scale * delta_q[delta_index])
+        joint_vector = np.clip(updated_joint_vector, lower_limits, upper_limits)
+        joint_vector = _apply_locked_joint_positions(joint_vector, joint_names, locked_joint_positions_rad)
+
+    limit_margin_rad = _compute_limit_margins(joint_names, joint_vector, lower_limits, upper_limits)
+    hit_limit_joints = [
+        joint_name
+        for joint_name, margin in limit_margin_rad.items()
+        if margin <= LIMIT_HIT_TOLERANCE_RAD
+    ]
+    joint_positions_rad = _joint_map_from_vector(joint_names, joint_vector)
+    joint_positions_deg = dict(
+        (joint_name, math.degrees(float(joint_positions_rad[joint_name])))
+        for joint_name in joint_names
+    )
+    tool_frame_description = describe_tool_frame(tool_frame, fallback_name=end_link)
+
+    return IKResult(
+        success=success,
+        status=status,
+        target_xyz_robot=target_xyz_robot,
+        final_xyz_robot=final_xyz_robot,
+        error_xyz_robot=error_xyz_robot,
+        error_m=float(np.linalg.norm(error_xyz_robot)),
+        iterations=iterations,
+        joint_positions_rad=joint_positions_rad,
+        joint_positions_deg=joint_positions_deg,
+        limit_margin_rad=limit_margin_rad,
+        hit_limit_joints=hit_limit_joints,
+        end_link=end_link,
+        tcp_frame=tool_frame_description["tcp_frame"],
+        tool_offset_xyz_m=np.asarray(tool_frame_description["tool_offset_xyz_m"], dtype=float),
+        tool_offset_rpy_deg=np.asarray(tool_frame_description["tool_offset_rpy_deg"], dtype=float),
+        seed_source="single_seed",
+        candidate_count=1,
+        joint_names=joint_names,
+        optimized_joint_names=[joint_names[joint_index] for joint_index in active_joint_indices],
+        locked_joints_rad=locked_joint_positions_rad,
+        approach_axis_local=approach_axis_local,
+        approach_axis_name=approach_axis_name or axis_name_from_vector(approach_axis_local),
+        approach_target_axis=approach_target_axis,
+        approach_tilt_deg=approach_tilt_current_deg,
+        approach_weight=approach_weight,
+        approach_preferred=True,
+        approach_enforced=bool(enforce_approach_angle),
+        selected_approach_tilt_limit_deg=selected_approach_tilt_limit_deg,
+        approach_angle_check=approach_angle_check,
+    )
+
+
 def solve_position_ik_multi_seed(
     model,
     target_xyz_robot,
@@ -188,6 +381,13 @@ def solve_position_ik_multi_seed(
     damping=0.05,
     step_scale=1.0,
     locked_joint_positions_rad=None,
+    approach_axis_local=None,
+    approach_target_axis=None,
+    approach_weight=0.05,
+    prefer_vertical_approach=False,
+    enforce_approach_angle=False,
+    selected_approach_tilt_limit_deg=None,
+    approach_axis_name=None,
 ):
     joint_names, lower_limits, upper_limits = _normalise_joint_limits(
         model,
@@ -230,6 +430,13 @@ def solve_position_ik_multi_seed(
         damping=damping,
         step_scale=step_scale,
         locked_joint_positions_rad=locked_joint_positions_rad,
+        approach_axis_local=approach_axis_local,
+        approach_target_axis=approach_target_axis,
+        approach_weight=approach_weight,
+        prefer_vertical_approach=prefer_vertical_approach,
+        enforce_approach_angle=enforce_approach_angle,
+        selected_approach_tilt_limit_deg=selected_approach_tilt_limit_deg,
+        approach_axis_name=approach_axis_name,
     )
     if best_success is not None:
         return best_success
@@ -257,6 +464,13 @@ def solve_position_ik_multi_seed(
         damping=damping,
         step_scale=step_scale,
         locked_joint_positions_rad=locked_joint_positions_rad,
+        approach_axis_local=approach_axis_local,
+        approach_target_axis=approach_target_axis,
+        approach_weight=approach_weight,
+        prefer_vertical_approach=prefer_vertical_approach,
+        enforce_approach_angle=enforce_approach_angle,
+        selected_approach_tilt_limit_deg=selected_approach_tilt_limit_deg,
+        approach_axis_name=approach_axis_name,
     )
     if random_success is not None:
         return random_success
@@ -462,23 +676,61 @@ def _evaluate_seed_entries(
     damping,
     step_scale,
     locked_joint_positions_rad,
+    approach_axis_local=None,
+    approach_target_axis=None,
+    approach_weight=0.05,
+    prefer_vertical_approach=False,
+    enforce_approach_angle=False,
+    selected_approach_tilt_limit_deg=None,
+    approach_axis_name=None,
 ):
     best_success = None
     best_failure = None
+    approach_enabled = bool(prefer_vertical_approach or enforce_approach_angle)
     for seed_entry in seed_entries:
-        result = solve_position_ik(
-            model,
-            target_xyz_robot,
-            seed_entry["joint_positions_rad"],
-            joint_limits_rad,
-            end_link=end_link,
-            tool_frame=tool_frame,
-            max_iters=max_iters,
-            tolerance_m=tolerance_m,
-            damping=damping,
-            step_scale=step_scale,
-            locked_joint_positions_rad=locked_joint_positions_rad,
-        )
+        if approach_enabled:
+            result = solve_position_ik_with_approach(
+                model,
+                target_xyz_robot,
+                seed_entry["joint_positions_rad"],
+                joint_limits_rad,
+                end_link=end_link,
+                tool_frame=tool_frame,
+                max_iters=max_iters,
+                tolerance_m=tolerance_m,
+                damping=damping,
+                step_scale=step_scale,
+                locked_joint_positions_rad=locked_joint_positions_rad,
+                approach_axis_local=approach_axis_local,
+                approach_target_axis=approach_target_axis,
+                approach_weight=approach_weight,
+                enforce_approach_angle=enforce_approach_angle,
+                selected_approach_tilt_limit_deg=selected_approach_tilt_limit_deg,
+                approach_axis_name=approach_axis_name,
+            )
+        else:
+            result = solve_position_ik(
+                model,
+                target_xyz_robot,
+                seed_entry["joint_positions_rad"],
+                joint_limits_rad,
+                end_link=end_link,
+                tool_frame=tool_frame,
+                max_iters=max_iters,
+                tolerance_m=tolerance_m,
+                damping=damping,
+                step_scale=step_scale,
+                locked_joint_positions_rad=locked_joint_positions_rad,
+            )
+            result.approach_axis_local = None
+            result.approach_axis_name = None
+            result.approach_target_axis = None
+            result.approach_tilt_deg = None
+            result.approach_weight = float(approach_weight)
+            result.approach_preferred = False
+            result.approach_enforced = False
+            result.selected_approach_tilt_limit_deg = selected_approach_tilt_limit_deg
+            result.approach_angle_check = None
         result.seed_source = str(seed_entry["source"])
         result.candidate_count = len(seed_entries)
         if result.success:
@@ -488,6 +740,40 @@ def _evaluate_seed_entries(
             if best_failure is None or _is_better_failure(result, best_failure):
                 best_failure = result
     return best_success, best_failure
+
+
+def _finite_difference_combined_jacobian(
+    model,
+    joint_names,
+    joint_vector,
+    active_joint_indices,
+    end_link,
+    tool_frame,
+    approach_axis_local,
+    base_position,
+    base_axis,
+    epsilon=FINITE_DIFFERENCE_STEP_RAD,
+):
+    active_count = len(active_joint_indices)
+    jacobian = np.zeros((6, active_count), dtype=float)
+    for active_index, joint_index in enumerate(active_joint_indices):
+        perturbed = np.asarray(joint_vector, dtype=float).copy()
+        perturbed[joint_index] = perturbed[joint_index] + float(epsilon)
+        perturbed_map = _joint_map_from_vector(joint_names, perturbed)
+        perturbed_transform = compute_tcp_transform(
+            model,
+            perturbed_map,
+            end_link=end_link,
+            tool_frame=tool_frame,
+        )
+        perturbed_position = perturbed_transform[:3, 3].copy()
+        perturbed_axis = normalize_vector(
+            np.dot(perturbed_transform[:3, :3], approach_axis_local),
+            "approach_axis_robot",
+        )
+        jacobian[:3, active_index] = (perturbed_position - base_position) / float(epsilon)
+        jacobian[3:, active_index] = (perturbed_axis - base_axis) / float(epsilon)
+    return jacobian
 
 
 def _deduplicate_seed_entries(seed_entries, joint_names):
@@ -511,6 +797,15 @@ def _deduplicate_seed_entries(seed_entries, joint_names):
 def _is_better_success(candidate, incumbent):
     candidate_margin = min(candidate.limit_margin_rad.values())
     incumbent_margin = min(incumbent.limit_margin_rad.values())
+    if bool(getattr(candidate, "approach_preferred", False)) or bool(getattr(candidate, "approach_enforced", False)):
+        candidate_tilt = float(getattr(candidate, "approach_tilt_deg", float("inf")))
+        incumbent_tilt = float(getattr(incumbent, "approach_tilt_deg", float("inf")))
+        return (candidate_tilt, candidate.error_m, -candidate_margin, candidate.iterations) < (
+            incumbent_tilt,
+            incumbent.error_m,
+            -incumbent_margin,
+            incumbent.iterations,
+        )
     return (candidate.error_m, -candidate_margin, candidate.iterations) < (
         incumbent.error_m,
         -incumbent_margin,
@@ -519,7 +814,13 @@ def _is_better_success(candidate, incumbent):
 
 
 def _is_better_failure(candidate, incumbent):
-    return (candidate.error_m, candidate.iterations) < (incumbent.error_m, incumbent.iterations)
+    candidate_tilt = float(getattr(candidate, "approach_tilt_deg", float("inf")))
+    incumbent_tilt = float(getattr(incumbent, "approach_tilt_deg", float("inf")))
+    return (candidate.error_m, candidate_tilt, candidate.iterations) < (
+        incumbent.error_m,
+        incumbent_tilt,
+        incumbent.iterations,
+    )
 
 
 def _as_xyz(values, name):
@@ -527,6 +828,18 @@ def _as_xyz(values, name):
     if vector.shape != (3,):
         raise ValueError("Expected %s to have shape (3,), got %s." % (name, vector.shape))
     return vector
+
+
+def _optional_array_to_list(values):
+    if values is None:
+        return None
+    return _array_to_list(values)
+
+
+def _optional_float(value):
+    if value is None:
+        return None
+    return float(value)
 
 
 def _array_to_list(values):

@@ -9,6 +9,11 @@ import time
 
 import numpy as np
 
+from chess_robot.robot.approach_orientation import WORLD_DOWN_AXIS
+from chess_robot.robot.approach_orientation import inspect_candidate_axes
+from chess_robot.robot.approach_orientation import resolve_approach_axis_local as resolve_selected_approach_axis_local
+from chess_robot.robot.approach_orientation import transform_local_axis_to_world
+from chess_robot.robot.approach_orientation import transform_world_axis_to_robot_base
 from chess_robot.robot.ik import find_nearest_workspace_seed
 from chess_robot.robot.ik import robot_base_point_to_world
 from chess_robot.robot.ik import sample_position_workspace
@@ -21,12 +26,9 @@ from chess_robot.robot.joint_calibration import load_joint_limits
 from chess_robot.robot.joint_calibration import load_pose_ticks
 from chess_robot.robot.joint_calibration import tick_to_angle_rad
 from chess_robot.robot.joint_limits import load_joint_safety_limits
-from chess_robot.robot.motion_safety import approach_axis_world
-from chess_robot.robot.motion_safety import approach_tilt_deg
 from chess_robot.robot.motion_safety import board_top_z_m
 from chess_robot.robot.motion_safety import low_zone_z_m
 from chess_robot.robot.motion_safety import make_approach_angle_check
-from chess_robot.robot.motion_safety import resolve_approach_axis_local
 from chess_robot.robot.motion_safety import validate_joint_interpolated_tcp_path
 from chess_robot.robot.reachability import generate_targets
 from chess_robot.robot.reachability import resolve_joint_limit_bounds
@@ -91,6 +93,7 @@ def run_single_pose_validation(args, bus_factory=None, ik_solver=None, now_fn=No
             target_robot,
             args,
             ik_solver=ik_solver,
+            square=target.get("square"),
         )
     final_tcp_world = robot_base_point_to_world(result.final_xyz_robot, context["scene_geometry"])
     target_ticks = joint_angles_to_ticks(result.joint_positions_rad, context["calibration"])
@@ -128,10 +131,10 @@ def run_single_pose_validation(args, bus_factory=None, ik_solver=None, now_fn=No
         locked_joint_ticks=context["locked_joint_ticks"],
         locked_joint_sources=context["locked_joint_sources"],
     )
-    attach_motion_safety_metadata(log, context, args, result)
+    attach_motion_safety_metadata(log, context, args, result, square=target.get("square"))
     if not bool(args.execute):
         attach_path_validation_from_reference_ticks(log, context, args, context.get("home_pose_ticks"), "saved_home_pose")
-    if bool(args.execute) and bool(getattr(args, "enforce_approach_angle", False)) and not bool(log["approach_angle_check"]["passed"]):
+    if bool(getattr(args, "enforce_approach_angle", False)) and not bool(log["approach_angle_check"]["passed"]):
         set_abort(log, log["approach_angle_check"]["failure_reason"])
 
     if not bool(result.success):
@@ -361,7 +364,7 @@ def build_home_pose_ik_result(context, target_robot):
     )
 
 
-def solve_single_target_ik(context, target_robot, args, ik_solver=None):
+def solve_single_target_ik(context, target_robot, args, ik_solver=None, square=None, prefer_vertical_approach=None, enforce_approach_angle=None):
     workspace_seed = None
     if int(args.workspace_seed_samples) > 0:
         workspace_samples = sample_position_workspace(
@@ -374,6 +377,13 @@ def solve_single_target_ik(context, target_robot, args, ik_solver=None):
         )
         workspace_seed = find_nearest_workspace_seed(target_robot, workspace_samples)["joint_positions_rad"]
     solver = ik_solver or solve_position_ik_multi_seed
+    approach_options = build_solver_approach_options(
+        context,
+        args,
+        square=square,
+        prefer_vertical_approach=prefer_vertical_approach,
+        enforce_approach_angle=enforce_approach_angle,
+    )
     return solver(
         context["model"],
         target_robot,
@@ -389,7 +399,87 @@ def solve_single_target_ik(context, target_robot, args, ik_solver=None):
         damping=args.damping,
         step_scale=args.step_scale,
         locked_joint_positions_rad=context["locked_joint_positions_rad"],
+        approach_axis_local=approach_options["approach_axis_local"],
+        approach_target_axis=approach_options["approach_target_axis_robot"],
+        approach_weight=approach_options["approach_weight"],
+        prefer_vertical_approach=approach_options["approach_preferred"],
+        enforce_approach_angle=approach_options["approach_enforced"],
+        selected_approach_tilt_limit_deg=approach_options["selected_approach_tilt_limit_deg"],
+        approach_axis_name=approach_options["approach_axis_name"],
     )
+
+
+def build_solver_approach_options(context, args, square=None, prefer_vertical_approach=None, enforce_approach_angle=None):
+    if prefer_vertical_approach is None:
+        prefer_vertical_approach = bool(getattr(args, "prefer_vertical_approach", False))
+    else:
+        prefer_vertical_approach = bool(prefer_vertical_approach)
+    if enforce_approach_angle is None:
+        enforce_approach_angle = bool(getattr(args, "enforce_approach_angle", False))
+    else:
+        enforce_approach_angle = bool(enforce_approach_angle)
+    resolved_axis = resolve_selected_approach_axis_local(
+        tool_frame=context.get("tool_frame"),
+        approach_axis_name=getattr(args, "approach_axis_name", None),
+        approach_axis_local=getattr(args, "approach_axis_local", None),
+    )
+    return {
+        "approach_axis_local": resolved_axis["axis_local"],
+        "approach_axis_name": resolved_axis["axis_name"],
+        "approach_axis_source": resolved_axis["source"],
+        "approach_axis_defaulted": bool(resolved_axis["defaulted"]),
+        "approach_target_axis_robot": transform_world_axis_to_robot_base(context["scene_geometry"], WORLD_DOWN_AXIS),
+        "approach_weight": float(getattr(args, "approach_weight", 0.05)),
+        "approach_preferred": bool(prefer_vertical_approach),
+        "approach_enforced": bool(enforce_approach_angle),
+        "selected_approach_tilt_limit_deg": float(selected_max_approach_tilt_deg(args, square)),
+    }
+
+
+def build_approach_report(context, args, joint_positions_rad, square=None, prefer_vertical_approach=None, enforce_approach_angle=None):
+    approach_options = build_solver_approach_options(
+        context,
+        args,
+        square=square,
+        prefer_vertical_approach=prefer_vertical_approach,
+        enforce_approach_angle=enforce_approach_angle,
+    )
+    robot_T_tcp = compute_tcp_transform(
+        context["model"],
+        joint_positions_rad,
+        end_link=context.get("end_link", DEFAULT_END_LINK),
+        tool_frame=context["tool_frame"],
+    )
+    world_T_tcp = np.dot(np.asarray(context["scene_geometry"]["world_T_robot_base"], dtype=float), robot_T_tcp)
+    candidate_axes = inspect_candidate_axes(world_T_tcp, reference_down_axis=WORLD_DOWN_AXIS)
+    best_candidate = candidate_axes[0]
+    axis_world = transform_local_axis_to_world(world_T_tcp, approach_options["approach_axis_local"])
+    tilt_deg = float(np.degrees(np.arccos(max(-1.0, min(1.0, float(np.dot(axis_world, WORLD_DOWN_AXIS)))))))
+    approach_check = make_approach_angle_check(tilt_deg, approach_options["selected_approach_tilt_limit_deg"])
+    approach_check["enforced"] = bool(approach_options["approach_enforced"])
+    approach_check["preferred"] = bool(approach_options["approach_preferred"])
+    report = {
+        "approach_axis_local": [float(value) for value in approach_options["approach_axis_local"]],
+        "approach_axis_name": approach_options["approach_axis_name"],
+        "approach_axis_source": approach_options["approach_axis_source"],
+        "approach_axis_local_defaulted": bool(approach_options["approach_axis_defaulted"]),
+        "approach_axis_local_warning": "approach_axis_local missing; defaulted to [0, 0, -1]." if approach_options["approach_axis_defaulted"] else None,
+        "approach_axis_world": [float(value) for value in axis_world],
+        "approach_tilt_deg": float(tilt_deg),
+        "approach_target_world_axis": [float(value) for value in WORLD_DOWN_AXIS],
+        "approach_weight": float(approach_options["approach_weight"]),
+        "approach_preferred": bool(approach_options["approach_preferred"]),
+        "approach_enforced": bool(approach_options["approach_enforced"]),
+        "approach_angle_check": approach_check,
+        "selected_approach_tilt_limit_deg": float(approach_options["selected_approach_tilt_limit_deg"]),
+        "max_approach_tilt_deg": float(getattr(args, "max_approach_tilt_deg", 10.0)),
+        "max_edge_approach_tilt_deg": float(getattr(args, "max_edge_approach_tilt_deg", 20.0)),
+        "best_candidate_axis_name": best_candidate["axis_name"],
+        "best_candidate_axis_local": best_candidate["axis_local"],
+        "best_candidate_axis_world": best_candidate["axis_world"],
+        "best_candidate_axis_tilt_deg": float(best_candidate["tilt_deg"]),
+    }
+    return report
 
 
 def resolve_locked_joints(args, calibration, home_pose_ticks):
@@ -641,25 +731,19 @@ def execute_single_pose(args, log, context, bus_factory=None, sleep_fn=None):
             bus.close()
 
 
-def attach_motion_safety_metadata(log, context, args, result):
+def attach_motion_safety_metadata(log, context, args, result, square=None, prefer_vertical_approach=None, enforce_approach_angle=None):
     board_top = board_top_z_m(context["scene_geometry"])
     board_clearance = float(getattr(args, "board_clearance_m", 0.060))
     low_zone = low_zone_z_m(context["scene_geometry"], board_clearance)
     transit_clearance = float(getattr(args, "transit_clearance_m", 0.090))
-    approach_axis_local, defaulted = resolve_approach_axis_local(context["tool_frame"])
-    tool_defaulted = bool(context["tool_frame"].get("approach_axis_local_defaulted", False)) if context.get("tool_frame") else bool(defaulted)
-    robot_T_tcp = compute_tcp_transform(
-        context["model"],
+    approach_report = build_approach_report(
+        context,
+        args,
         result.joint_positions_rad,
-        end_link=context.get("end_link", DEFAULT_END_LINK),
-        tool_frame=context["tool_frame"],
+        square=square if square is not None else log.get("square"),
+        prefer_vertical_approach=prefer_vertical_approach,
+        enforce_approach_angle=enforce_approach_angle,
     )
-    world_T_tcp = np.dot(np.asarray(context["scene_geometry"]["world_T_robot_base"], dtype=float), robot_T_tcp)
-    axis_world = approach_axis_world(world_T_tcp, approach_axis_local)
-    tilt_deg = approach_tilt_deg(axis_world)
-    max_tilt_deg = selected_max_approach_tilt_deg(args, log.get("square"))
-    approach_check = make_approach_angle_check(tilt_deg, max_tilt_deg)
-    approach_check["enforced"] = bool(getattr(args, "enforce_approach_angle", False))
 
     log["board_top_z_m"] = float(board_top)
     log["board_clearance_m"] = float(board_clearance)
@@ -669,14 +753,7 @@ def attach_motion_safety_metadata(log, context, args, result):
     log["path_samples"] = int(getattr(args, "path_samples", 25))
     log["path_validation"] = unavailable_path_validation("not evaluated yet", low_zone, getattr(args, "path_samples", 25))
     log["path_validation_note"] = "Approximate joint-space FK safety gate only; not a full collision checker."
-    log["approach_axis_local"] = [float(value) for value in approach_axis_local]
-    log["approach_axis_local_defaulted"] = bool(tool_defaulted)
-    log["approach_axis_local_warning"] = "approach_axis_local missing; defaulted to [0, 0, -1]." if tool_defaulted else None
-    log["approach_axis_world"] = [float(value) for value in axis_world]
-    log["approach_tilt_deg"] = float(tilt_deg)
-    log["max_approach_tilt_deg"] = float(max_tilt_deg)
-    log["max_edge_approach_tilt_deg"] = float(getattr(args, "max_edge_approach_tilt_deg", 25.0))
-    log["approach_angle_check"] = approach_check
+    log.update(approach_report)
 
 
 def attach_path_validation_from_reference_ticks(log, context, args, reference_ticks, reference_source):
@@ -734,8 +811,8 @@ def should_enforce_board_clearance(args):
 
 def selected_max_approach_tilt_deg(args, square):
     if is_edge_square(square):
-        return float(getattr(args, "max_edge_approach_tilt_deg", 25.0))
-    return float(getattr(args, "max_approach_tilt_deg", 15.0))
+        return float(getattr(args, "max_edge_approach_tilt_deg", 20.0))
+    return float(getattr(args, "max_approach_tilt_deg", 10.0))
 
 
 def is_edge_square(square):

@@ -195,6 +195,37 @@ def test_target_offsets_are_used_in_plan():
     assert plan[2]["target_world_xyz_m"][2] == 0.107
 
 
+
+
+def test_old_settle_time_behavior_remains_for_all_segments(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home", "--settle-time-s", "1.25"]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert [segment["settle_time_s"] for segment in log["segments"]] == [1.25, 1.25, 1.25, 1.25, 1.25, 1.25]
+
+
+def test_split_settle_times_apply_to_intermediate_and_final_segments(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--return-home",
+            "--intermediate-settle-time-s", "0.5",
+            "--final-settle-time-s", "1.5",
+        ]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    by_name = dict((segment["segment_name"], segment["settle_time_s"]) for segment in log["segments"])
+    assert by_name["current_lift"] == 0.5
+    assert by_name["target_high_above"] == 0.5
+    assert by_name["target_high_above_return"] == 0.5
+    assert by_name["home_high"] == 0.5
+    assert by_name["target_normal_above"] == 1.5
+    assert by_name["home_pose"] == 1.5
+
 def test_dry_run_never_commands_hardware(tmpdir, monkeypatch):
     monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
 
@@ -348,9 +379,67 @@ def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
         "safety_checks",
         "path_validation",
         "approach_tilt_deg",
+        "settle_time_s",
         "command_sent",
         "abort_reason",
     ]
     for key in required:
         assert key in saved["segments"][0]
     assert log["segments"][0]["ik_success"] is True
+
+
+def _failed_transfer_approach_report(context, args, joint_positions_rad, square=None, prefer_vertical_approach=None, enforce_approach_angle=None):
+    del context, args, joint_positions_rad, square
+    return {
+        "approach_axis_local": [0.0, 0.0, -1.0],
+        "approach_axis_name": "minus_z",
+        "approach_axis_source": "tool_frame",
+        "approach_axis_local_defaulted": False,
+        "approach_axis_local_warning": None,
+        "approach_axis_world": [1.0, 0.0, 0.0],
+        "approach_tilt_deg": 90.0,
+        "approach_target_world_axis": [0.0, 0.0, -1.0],
+        "approach_weight": 0.05,
+        "approach_preferred": bool(prefer_vertical_approach),
+        "approach_enforced": bool(enforce_approach_angle),
+        "approach_angle_check": {
+            "passed": False,
+            "tilt_deg": 90.0,
+            "max_tilt_deg": 10.0,
+            "failure_reason": "synthetic transfer tilt failure",
+            "enforced": bool(enforce_approach_angle),
+            "preferred": bool(prefer_vertical_approach),
+        },
+        "selected_approach_tilt_limit_deg": 10.0,
+        "max_approach_tilt_deg": 10.0,
+        "max_edge_approach_tilt_deg": 20.0,
+        "best_candidate_axis_name": "plus_x",
+        "best_candidate_axis_local": [1.0, 0.0, 0.0],
+        "best_candidate_axis_world": [0.0, 0.0, -1.0],
+        "best_candidate_axis_tilt_deg": 0.0,
+    }
+
+
+def test_enforced_target_segment_aborts_before_command(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    monkeypatch.setattr(safe_transfer, "build_approach_report", _failed_transfer_approach_report)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--prefer-vertical-approach", "--enforce-approach-angle"]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert log["abort_reason"] == "synthetic transfer tilt failure"
+    assert log["segments"][1]["segment_name"] == "target_high_above"
+    assert log["segments"][1]["command_sent"] is False
+
+
+def test_home_pose_segment_is_not_forced_to_vertical_approach(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home", "--prefer-vertical-approach"]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    home_pose_segment = [segment for segment in log["segments"] if segment["segment_name"] == "home_pose"][0]
+    assert home_pose_segment["approach_preferred"] is False
+    assert home_pose_segment["approach_enforced"] is False

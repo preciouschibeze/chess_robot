@@ -1,9 +1,13 @@
 from __future__ import absolute_import
 
+import math
 import os
 import sys
 
 import numpy as np
+
+from chess_robot.robot import ik as ik_module
+from chess_robot.robot.approach_orientation import transform_world_axis_to_robot_base
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -189,3 +193,98 @@ def test_locked_wrist_roll_stays_at_saved_home_and_is_removed_from_optimisation_
     assert abs(result.joint_positions_rad["wrist_roll"] - home_joint_positions["wrist_roll"]) <= 1.0e-12
     assert result.locked_joints_rad["wrist_roll"] == locked["wrist_roll"]
     assert angle_rad_to_tick("wrist_roll", result.joint_positions_rad["wrist_roll"], calibration) == 1091
+
+
+def _fake_orientation_solver_transform(model, joint_positions_rad, end_link=None, tool_frame=None):
+    del model, end_link, tool_frame
+    slide = float(joint_positions_rad["slide"])
+    tilt = float(joint_positions_rad["tilt"])
+    cosine = math.cos(tilt)
+    sine = math.sin(tilt)
+    transform = np.eye(4, dtype=float)
+    transform[:3, :3] = np.asarray([
+        [cosine, 0.0, sine],
+        [0.0, 1.0, 0.0],
+        [-sine, 0.0, cosine],
+    ], dtype=float)
+    transform[:3, 3] = np.asarray([slide, 0.0, 0.0], dtype=float)
+    return transform
+
+
+def _fake_orientation_position_jacobian(model, joint_map, joint_names=None, end_link=None, tool_frame=None):
+    del model, joint_map, joint_names, end_link, tool_frame
+    return np.asarray([
+        [1.0, 0.0],
+        [0.0, 0.0],
+        [0.0, 0.0],
+    ], dtype=float)
+
+
+def test_locked_wrist_roll_stays_fixed_when_approach_preference_enabled():
+    model, scene_geometry, calibration, home_joint_positions, tool_frame, joint_limit_bounds = load_common_context()
+    targets = generate_targets(scene_geometry, above_board_offset_m=0.080, pick_offset_m=0.030)
+    d4_above = [target for target in targets if target["target_name"] == "d4_above"][0]
+    target_robot = world_point_to_robot_base(
+        np.asarray((d4_above["x_m"], d4_above["y_m"], d4_above["z_m"]), dtype=float),
+        scene_geometry,
+    )
+    locked = {"wrist_roll": home_joint_positions["wrist_roll"]}
+    result = solve_position_ik_multi_seed(
+        model,
+        target_robot,
+        joint_limit_bounds,
+        tool_frame=tool_frame,
+        home_joint_positions_rad=home_joint_positions,
+        random_seeds=5,
+        seed=7,
+        locked_joint_positions_rad=locked,
+        approach_axis_local=np.asarray([0.0, 0.0, -1.0], dtype=float),
+        approach_target_axis=transform_world_axis_to_robot_base(scene_geometry, np.asarray([0.0, 0.0, -1.0], dtype=float)),
+        approach_weight=0.05,
+        prefer_vertical_approach=True,
+        selected_approach_tilt_limit_deg=20.0,
+    )
+    assert "wrist_roll" not in result.optimized_joint_names
+    assert abs(result.joint_positions_rad["wrist_roll"] - home_joint_positions["wrist_roll"]) <= 1.0e-12
+    assert result.locked_joints_rad["wrist_roll"] == locked["wrist_roll"]
+    assert angle_rad_to_tick("wrist_roll", result.joint_positions_rad["wrist_roll"], calibration) == 1091
+
+
+def test_approach_preference_reduces_tilt_in_synthetic_case(monkeypatch):
+    monkeypatch.setattr(ik_module, "compute_tcp_transform", _fake_orientation_solver_transform)
+    monkeypatch.setattr(ik_module, "compute_position_jacobian", _fake_orientation_position_jacobian)
+    joint_limits = {
+        "joint_names": ["slide", "tilt"],
+        "lower_limits": np.asarray([-2.0, -1.5], dtype=float),
+        "upper_limits": np.asarray([2.0, 1.5], dtype=float),
+    }
+    seed = {"slide": 0.0, "tilt": 0.8}
+    target_robot = np.asarray([1.0, 0.0, 0.0], dtype=float)
+    unconstrained = ik_module.solve_position_ik(
+        None,
+        target_robot,
+        seed,
+        joint_limits,
+        tolerance_m=1.0e-6,
+        max_iters=50,
+    )
+    preferred = ik_module.solve_position_ik_multi_seed(
+        None,
+        target_robot,
+        joint_limits,
+        seeds=[{"source": "provided", "joint_positions_rad": seed}],
+        random_seeds=0,
+        tolerance_m=1.0e-6,
+        max_iters=200,
+        approach_axis_local=np.asarray([0.0, 0.0, -1.0], dtype=float),
+        approach_target_axis=np.asarray([0.0, 0.0, -1.0], dtype=float),
+        approach_weight=0.2,
+        prefer_vertical_approach=True,
+        selected_approach_tilt_limit_deg=10.0,
+    )
+    unconstrained_tilt_deg = abs(math.degrees(seed["tilt"]))
+    assert unconstrained.success is True
+    assert preferred.success is True
+    assert preferred.error_m <= 1.0e-4
+    assert abs(preferred.joint_positions_rad["tilt"]) < abs(seed["tilt"])
+    assert float(preferred.approach_tilt_deg) < unconstrained_tilt_deg

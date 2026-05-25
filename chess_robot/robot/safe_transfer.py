@@ -13,6 +13,7 @@ from chess_robot.robot.ik import world_point_to_robot_base
 from chess_robot.robot.ik_validation import ARM_JOINTS
 from chess_robot.robot.ik_validation import arm_joint_mapping
 from chess_robot.robot.ik_validation import arm_servo_ids
+from chess_robot.robot.ik_validation import build_approach_report
 from chess_robot.robot.ik_validation import build_execution_bus
 from chess_robot.robot.ik_validation import build_home_pose_ik_result
 from chess_robot.robot.ik_validation import build_interpolated_tick_waypoints
@@ -173,6 +174,8 @@ def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz,
                 "target_world_xyz_m": [float(value) for value in home],
             },
         ])
+    for segment in plan:
+        segment["settle_time_s"] = resolve_segment_settle_time(segment["segment_name"], args)
     return plan
 
 
@@ -182,6 +185,18 @@ def make_world_segment(name, values):
         "target_mode": "world_xyz",
         "target_world_xyz_m": [float(value) for value in values],
     }
+
+
+def segment_uses_approach_preference(spec, args):
+    if not bool(getattr(args, "prefer_vertical_approach", False)):
+        return False
+    return str(spec.get("segment_name") or "").startswith("target_")
+
+
+def segment_uses_approach_enforcement(spec, args):
+    if not bool(getattr(args, "enforce_approach_angle", False)):
+        return False
+    return segment_uses_approach_preference(spec, args)
 
 
 def evaluate_segment(segment_index, spec, current_ticks, context, args, ik_solver=None):
@@ -197,7 +212,17 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, ik_solve
         else:
             solver_context = dict(context)
             solver_context["home_seed"] = current_rad
-            result = solve_single_target_ik(solver_context, target_robot, args, ik_solver=ik_solver)
+            segment_prefer = segment_uses_approach_preference(spec, args)
+            segment_enforce = segment_uses_approach_enforcement(spec, args)
+            result = solve_single_target_ik(
+                solver_context,
+                target_robot,
+                args,
+                ik_solver=ik_solver,
+                square=getattr(args, "square", None),
+                prefer_vertical_approach=segment_prefer,
+                enforce_approach_angle=segment_enforce,
+            )
             target_ticks = joint_angles_to_ticks(result.joint_positions_rad, context["calibration"])
 
         final_tcp_world = robot_base_point_to_world(result.final_xyz_robot, context["scene_geometry"])
@@ -233,9 +258,11 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, ik_solve
             path_validation.get("failure_reason") or "Board-clearance path validation failed.",
         ))
         segment["safety_checks"] = safety_checks
-        attach_approach_diagnostics(segment, context, result.joint_positions_rad)
+        attach_approach_diagnostics(segment, context, args, result.joint_positions_rad, getattr(args, "square", None), segment_uses_approach_preference(spec, args), segment_uses_approach_enforcement(spec, args))
 
-        if not bool(result.success):
+        if segment.get("approach_enforced") and not bool(segment.get("approach_angle_check", {}).get("passed")):
+            segment["abort_reason"] = segment.get("approach_angle_check", {}).get("failure_reason")
+        elif not bool(result.success):
             segment["abort_reason"] = "IK failed: %s" % result.status
         elif not all_checks_ok(safety_checks):
             segment["abort_reason"] = first_failed_check_reason(safety_checks)
@@ -260,7 +287,7 @@ def execute_segment(segment, current_ticks, bus, servo_ids, args, sleep_fn):
                 bus.write_goal_position(servo_ids[joint_name], waypoint[joint_name])
                 wrote_any = True
             sleep_fn(inter_waypoint_delay_s(args.speed_scale))
-        sleep_fn(float(args.settle_time_s))
+        sleep_fn(float(segment["settle_time_s"]))
         final_ticks = read_current_ticks(bus, servo_ids)
         segment["final_ticks_after"] = final_ticks
         segment["readback_errors_ticks"] = calculate_readback_errors(final_ticks, segment["target_ticks"])
@@ -301,20 +328,16 @@ def validate_segment_path(context, args, current_ticks, target_ticks):
     return summary
 
 
-def attach_approach_diagnostics(segment, context, joint_positions_rad):
-    approach_axis_local, defaulted = resolve_approach_axis_local(context["tool_frame"])
-    robot_t_tcp = compute_tcp_transform(
-        context["model"],
+def attach_approach_diagnostics(segment, context, args, joint_positions_rad, square, prefer_vertical_approach, enforce_approach_angle):
+    report = build_approach_report(
+        context,
+        args,
         joint_positions_rad,
-        end_link=context.get("end_link", DEFAULT_END_LINK),
-        tool_frame=context["tool_frame"],
+        square=square,
+        prefer_vertical_approach=prefer_vertical_approach,
+        enforce_approach_angle=enforce_approach_angle,
     )
-    world_t_tcp = np.dot(np.asarray(context["scene_geometry"]["world_T_robot_base"], dtype=float), robot_t_tcp)
-    axis_world = approach_axis_world(world_t_tcp, approach_axis_local)
-    segment["approach_axis_local"] = xyz_list(approach_axis_local)
-    segment["approach_axis_world"] = xyz_list(axis_world)
-    segment["approach_axis_local_defaulted"] = bool(defaulted)
-    segment["approach_tilt_deg"] = float(approach_tilt_deg(axis_world))
+    segment.update(report)
 
 
 def base_segment_log(segment_index, spec, target_world, target_robot, current_ticks):
@@ -336,11 +359,35 @@ def base_segment_log(segment_index, spec, target_world, target_robot, current_ti
         "readback_errors_ticks": None,
         "safety_checks": [],
         "path_validation": None,
+        "approach_axis_local": None,
+        "approach_axis_name": None,
+        "approach_axis_source": None,
+        "approach_axis_world": None,
+        "approach_target_world_axis": None,
         "approach_tilt_deg": None,
+        "approach_weight": None,
+        "approach_preferred": False,
+        "approach_enforced": False,
+        "approach_angle_check": None,
+        "selected_approach_tilt_limit_deg": None,
+        "best_candidate_axis_name": None,
+        "best_candidate_axis_local": None,
+        "best_candidate_axis_world": None,
+        "best_candidate_axis_tilt_deg": None,
+        "settle_time_s": float(spec["settle_time_s"]),
         "command_sent": False,
         "abort_reason": None,
     }
 
+
+
+def resolve_segment_settle_time(segment_name, args):
+    base = float(args.settle_time_s)
+    if segment_name in ("target_normal_above", "home_pose"):
+        value = getattr(args, "final_settle_time_s", None)
+        return base if value is None else float(value)
+    value = getattr(args, "intermediate_settle_time_s", None)
+    return base if value is None else float(value)
 
 def build_transfer_log(args, context, timestamp, mode, board_top):
     locked_ticks = context.get("locked_joint_ticks") or {}

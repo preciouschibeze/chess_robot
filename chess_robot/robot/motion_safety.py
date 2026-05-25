@@ -1,14 +1,15 @@
 from __future__ import absolute_import
 
-import math
-
 import numpy as np
 
+from chess_robot.robot.approach_orientation import DEFAULT_APPROACH_AXIS_LOCAL
+from chess_robot.robot.approach_orientation import WORLD_DOWN_AXIS
+from chess_robot.robot.approach_orientation import approach_tilt_deg
+from chess_robot.robot.approach_orientation import make_approach_angle_check
+from chess_robot.robot.approach_orientation import normalize_vector
+from chess_robot.robot.approach_orientation import resolve_approach_axis_local as resolve_selected_approach_axis_local
+from chess_robot.robot.approach_orientation import transform_local_axis_to_world
 from chess_robot.robot.tool_frames import compute_tcp_transform
-
-
-DEFAULT_APPROACH_AXIS_LOCAL = np.asarray((0.0, 0.0, -1.0), dtype=float)
-WORLD_DOWN_AXIS = np.asarray((0.0, 0.0, -1.0), dtype=float)
 
 
 def board_top_z_m(scene_geometry):
@@ -19,53 +20,13 @@ def low_zone_z_m(scene_geometry, board_clearance_m):
     return board_top_z_m(scene_geometry) + float(board_clearance_m)
 
 
-def normalize_vector(values, name):
-    vector = np.asarray(values, dtype=float)
-    if vector.shape != (3,):
-        raise ValueError("%s must have shape (3,)." % name)
-    norm = float(np.linalg.norm(vector))
-    if norm <= 1.0e-12:
-        raise ValueError("%s must be non-zero." % name)
-    return vector / norm
-
-
 def resolve_approach_axis_local(tool_frame):
-    raw_axis = None
-    if tool_frame is not None:
-        raw_axis = tool_frame.get("approach_axis_local")
-    defaulted = raw_axis is None
-    axis = DEFAULT_APPROACH_AXIS_LOCAL if defaulted else raw_axis
-    return normalize_vector(axis, "approach_axis_local"), defaulted
+    resolved = resolve_selected_approach_axis_local(tool_frame=tool_frame)
+    return resolved["axis_local"], resolved["defaulted"]
 
 
 def approach_axis_world(tcp_world_transform, approach_axis_local):
-    transform = np.asarray(tcp_world_transform, dtype=float)
-    if transform.shape != (4, 4):
-        raise ValueError("tcp_world_transform must have shape (4, 4).")
-    local_axis = normalize_vector(approach_axis_local, "approach_axis_local")
-    world_axis = np.dot(transform[:3, :3], local_axis)
-    return normalize_vector(world_axis, "approach_axis_world")
-
-
-def approach_tilt_deg(axis_world, reference_down_axis=None):
-    axis = normalize_vector(axis_world, "approach_axis_world")
-    down = normalize_vector(reference_down_axis if reference_down_axis is not None else WORLD_DOWN_AXIS, "reference_down_axis")
-    dot = float(np.dot(axis, down))
-    dot = max(-1.0, min(1.0, dot))
-    return float(math.degrees(math.acos(dot)))
-
-
-def make_approach_angle_check(tilt_deg, max_tilt_deg):
-    ok = float(tilt_deg) <= float(max_tilt_deg)
-    return {
-        "passed": bool(ok),
-        "tilt_deg": float(tilt_deg),
-        "max_tilt_deg": float(max_tilt_deg),
-        "failure_reason": None if ok else "Approach tilt %.3f deg exceeds limit %.3f deg." % (
-            float(tilt_deg),
-            float(max_tilt_deg),
-        ),
-    }
+    return transform_local_axis_to_world(tcp_world_transform, approach_axis_local)
 
 
 def interpolate_joint_positions(start_joint_positions_rad, target_joint_positions_rad, joint_names, samples_count):
