@@ -28,6 +28,7 @@ JOINT_LIMITS_PATH = os.path.join(ROOT, "data", "calibration", "robot", "joint_li
 JOINT_SAFETY_LIMITS_PATH = os.path.join(ROOT, "data", "calibration", "robot", "joint_safety_limits.yaml")
 HOME_POSE_PATH = os.path.join(ROOT, "data", "calibration", "robot", "home_pose.yaml")
 TOOL_FRAMES_PATH = os.path.join(ROOT, "data", "calibration", "gripper", "tool_frames.yaml")
+APPROACH_POLICY_PATH = os.path.join(ROOT, "data", "calibration", "robot", "approach_policy.yaml")
 
 CLI_SPEC = importlib.util.spec_from_file_location(
     "safe_square_transfer_cli",
@@ -443,3 +444,22 @@ def test_home_pose_segment_is_not_forced_to_vertical_approach(tmpdir, monkeypatc
     home_pose_segment = [segment for segment in log["segments"] if segment["segment_name"] == "home_pose"][0]
     assert home_pose_segment["approach_preferred"] is False
     assert home_pose_segment["approach_enforced"] is False
+
+
+def test_policy_resolved_json_is_saved_for_safe_transfer(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    args = _args(tmpdir, ["--square", "a1", "--approach-policy", APPROACH_POLICY_PATH])
+    log = safe_transfer.run_safe_square_transfer(
+        args,
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    with open(args.output, "r") as handle:
+        saved = json.load(handle)
+    assert saved["approach_policy_path"] == APPROACH_POLICY_PATH
+    assert saved["approach_policy_square"] == "a1"
+    assert saved["policy_override_applied"] is True
+    assert saved["resolved_policy"]["approach_axis_name"] == "plus_z"
+    assert saved["resolved_policy"]["approach_weight"] == 0.02
+    assert saved["resolved_policy"]["lock_wrist_roll_home"] is True
+    assert log["command_sent_any"] is False

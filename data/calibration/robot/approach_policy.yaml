@@ -1,0 +1,27 @@
+approach_policy:
+  version: 1
+  default:
+    prefer_vertical_approach: true
+    enforce_approach_angle: false
+    approach_axis_name: plus_z
+    approach_weight: 0.05
+    max_approach_tilt_deg: 20.0
+    max_edge_approach_tilt_deg: 30.0
+    normal_above_offset_m: 0.080
+    high_above_offset_m: 0.120
+    transit_clearance_m: 0.120
+    board_clearance_m: 0.060
+    lock_wrist_roll_home: true
+  overrides:
+    a1:
+      approach_weight: 0.02
+      enforce_approach_angle: false
+      notes: "Far-rank corner; relaxed vertical approach required."
+    b1:
+      approach_weight: 0.02
+      enforce_approach_angle: false
+      notes: "Far-rank square; relaxed vertical approach required."
+    h1:
+      approach_weight: 0.02
+      enforce_approach_angle: false
+      notes: "Far-rank corner; relaxed vertical approach required."

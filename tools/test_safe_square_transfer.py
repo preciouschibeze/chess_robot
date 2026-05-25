@@ -2,6 +2,7 @@
 from __future__ import absolute_import, print_function
 
 import argparse
+import json
 import os
 import sys
 
@@ -9,6 +10,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
+from chess_robot.robot.approach_policy import ApproachPolicyError
+from chess_robot.robot.approach_policy import apply_approach_policy
 from chess_robot.robot.safe_transfer import CONFIRM_TEXT
 from chess_robot.robot.safe_transfer import DEFAULT_CSV_LOG_PATH
 from chess_robot.robot.safe_transfer import run_safe_square_transfer
@@ -26,10 +29,41 @@ DEFAULT_JOINT_LIMITS_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robo
 DEFAULT_JOINT_SAFETY_LIMITS_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "joint_safety_limits.yaml")
 DEFAULT_HOME_POSE_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "home_pose.yaml")
 DEFAULT_TOOL_FRAMES_PATH = os.path.join(REPO_ROOT, "data", "calibration", "gripper", "tool_frames.yaml")
+DEFAULT_APPROACH_POLICY_PATH = os.path.join(REPO_ROOT, "data", "calibration", "robot", "approach_policy.yaml")
+
+
+class PolicyAwareArgumentParser(argparse.ArgumentParser):
+    def parse_args(self, args=None, namespace=None):
+        explicit_dests = collect_explicit_argument_dests(self, args)
+        parsed = argparse.ArgumentParser.parse_args(self, args=args, namespace=namespace)
+        try:
+            return apply_approach_policy(parsed, explicit_dests)
+        except ApproachPolicyError as exc:
+            self.error(str(exc))
+
+
+def collect_explicit_argument_dests(parser, args):
+    values = sys.argv[1:] if args is None else list(args)
+    option_to_dest = {}
+    for action in parser._actions:
+        for option_string in action.option_strings:
+            option_to_dest[option_string] = action.dest
+
+    explicit_dests = set()
+    for token in values:
+        if token == "--":
+            break
+        if not token.startswith("-"):
+            continue
+        option_name = token.split("=", 1)[0]
+        destination = option_to_dest.get(option_name)
+        if destination is not None:
+            explicit_dests.add(destination)
+    return explicit_dests
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description="Validate a staged safe square-above transfer for the SO101 chess robot.")
+    parser = PolicyAwareArgumentParser(description="Validate a staged safe square-above transfer for the SO101 chess robot.")
     parser.add_argument("--urdf", default=DEFAULT_URDF_PATH, help="URDF model path.")
     parser.add_argument("--scene", default=DEFAULT_SCENE_PATH, help="Scene geometry YAML path.")
     parser.add_argument("--joint-calibration", default=DEFAULT_JOINT_CALIBRATION_PATH, help="Joint calibration YAML path.")
@@ -43,6 +77,7 @@ def build_parser():
     parser.add_argument("--output", required=True, help="JSON output path.")
     parser.add_argument("--csv-log", default=DEFAULT_CSV_LOG_PATH, help="CSV summary append path.")
     parser.add_argument("--square", required=True, help="Board square target, for example e4.")
+    parser.add_argument("--approach-policy", default=None, help="Approach policy YAML path, for example %s." % DEFAULT_APPROACH_POLICY_PATH)
 
     parser.add_argument("--normal-above-offset-m", type=float, default=0.080, help="Normal above-square height above board top.")
     parser.add_argument("--high-above-offset-m", type=float, default=0.120, help="High above-square height above board top.")
@@ -98,6 +133,11 @@ def build_parser():
 def print_report(log, output_path):
     print("Mode: %s" % log["mode"])
     print("Square: %s" % log["square"])
+    print("Approach policy path: %s" % (log.get("approach_policy_path") or "none"))
+    print("Approach policy square: %s" % (log.get("approach_policy_square") or "none"))
+    print("Policy override applied: %s" % bool(log.get("policy_override_applied", False)))
+    if log.get("resolved_policy") is not None:
+        print("Resolved policy: %s" % json.dumps(log["resolved_policy"], sort_keys=True))
     if log.get("locked_joints"):
         print("Locked joints: %s" % ", ".join(sorted(log["locked_joints"].keys())))
     print("Segments:")

@@ -391,11 +391,18 @@ def resolve_segment_settle_time(segment_name, args):
 
 def build_transfer_log(args, context, timestamp, mode, board_top):
     locked_ticks = context.get("locked_joint_ticks") or {}
+    resolved_policy = getattr(args, "resolved_policy", None)
+    if resolved_policy is not None:
+        resolved_policy = dict((key, resolved_policy[key]) for key in sorted(resolved_policy.keys()))
     return {
         "timestamp": timestamp,
         "mode": mode,
         "square": str(args.square).lower(),
         "tcp_frame": args.tcp_frame,
+        "approach_policy_path": getattr(args, "approach_policy_path", getattr(args, "approach_policy", None)),
+        "approach_policy_square": getattr(args, "approach_policy_square", None),
+        "resolved_policy": resolved_policy,
+        "policy_override_applied": bool(getattr(args, "policy_override_applied", False)),
         "locked_joints": dict((joint, int(value)) for joint, value in locked_ticks.items()),
         "locked_joint_sources": dict((joint, str(value)) for joint, value in (context.get("locked_joint_sources") or {}).items()),
         "board_top_z_m": float(board_top),
