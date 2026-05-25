@@ -25,6 +25,8 @@ APPROACH_POLICY_FIELDS = (
     "high_above_offset_m",
     "transit_clearance_m",
     "board_clearance_m",
+    "return_route_squares",
+    "route_above_offset_m",
     "lock_wrist_roll_home",
 )
 
@@ -41,6 +43,7 @@ _FLOAT_FIELDS = (
     "high_above_offset_m",
     "transit_clearance_m",
     "board_clearance_m",
+    "route_above_offset_m",
 )
 
 
@@ -81,6 +84,7 @@ def load_approach_policy(path):
         "approach policy default",
         require_all_fields=True,
     )
+    default_policy = _apply_policy_defaults(default_policy)
 
     overrides_root = root.get("overrides") or {}
     if not isinstance(overrides_root, dict):
@@ -107,6 +111,7 @@ def resolve_approach_policy(policy_document, square):
     resolved_policy = dict(policy_document["default"])
     normalized_square = None
     override_applied = False
+    route_above_offset_explicit = False
 
     if square is not None:
         normalized_square = str(square).lower()
@@ -116,6 +121,15 @@ def resolve_approach_policy(policy_document, square):
             for field_name in APPROACH_POLICY_FIELDS:
                 if field_name in override:
                     resolved_policy[field_name] = override[field_name]
+                    if field_name == "route_above_offset_m":
+                        route_above_offset_explicit = True
+
+    if "return_route_squares" not in resolved_policy:
+        resolved_policy["return_route_squares"] = []
+    else:
+        resolved_policy["return_route_squares"] = list(resolved_policy["return_route_squares"])
+    if not route_above_offset_explicit:
+        resolved_policy["route_above_offset_m"] = float(resolved_policy["high_above_offset_m"])
 
     return {
         "path": policy_document["path"],
@@ -123,12 +137,14 @@ def resolve_approach_policy(policy_document, square):
         "square": normalized_square,
         "resolved_policy": resolved_policy,
         "policy_override_applied": override_applied,
+        "route_above_offset_explicit": bool(route_above_offset_explicit),
     }
 
 
 def apply_approach_policy(args, explicit_dests=None):
     explicit_dests = set(explicit_dests or [])
     policy_path = getattr(args, "approach_policy", None)
+    _apply_argument_route_defaults(args)
     if not policy_path:
         args.approach_policy_path = None
         args.approach_policy_square = None
@@ -143,6 +159,18 @@ def apply_approach_policy(args, explicit_dests=None):
     for field_name in APPROACH_POLICY_FIELDS:
         if field_name not in explicit_dests:
             setattr(args, field_name, merged_policy[field_name])
+    if (
+        "route_above_offset_m" not in explicit_dests
+        and "high_above_offset_m" in explicit_dests
+        and not bool(policy_info.get("route_above_offset_explicit"))
+    ):
+        args.route_above_offset_m = float(args.high_above_offset_m)
+    if getattr(args, "return_route_squares", None) is None:
+        args.return_route_squares = []
+    else:
+        args.return_route_squares = list(args.return_route_squares)
+    if getattr(args, "route_above_offset_m", None) is None:
+        args.route_above_offset_m = float(args.high_above_offset_m)
 
     args.approach_policy_path = policy_path
     args.approach_policy_square = policy_info["square"]
@@ -172,6 +200,10 @@ def _normalize_policy_entry(raw_entry, label, require_all_fields):
             if isinstance(value, bool):
                 raise ApproachPolicyError("%s field %s must be numeric." % (label, field_name))
             normalized[field_name] = float(value)
+        elif field_name == "return_route_squares":
+            if not isinstance(value, list):
+                raise ApproachPolicyError("%s field %s must be a list." % (label, field_name))
+            normalized[field_name] = [str(item).strip().lower() for item in value]
         elif field_name == "approach_axis_name":
             axis_name = str(value)
             if axis_name not in APPROACH_AXIS_NAMES:
@@ -181,3 +213,25 @@ def _normalize_policy_entry(raw_entry, label, require_all_fields):
                 )
             normalized[field_name] = axis_name
     return normalized
+
+
+def _apply_policy_defaults(policy_entry):
+    normalized = dict(policy_entry)
+    if "return_route_squares" not in normalized:
+        normalized["return_route_squares"] = []
+    else:
+        normalized["return_route_squares"] = list(normalized["return_route_squares"])
+    if "route_above_offset_m" not in normalized and "high_above_offset_m" in normalized:
+        normalized["route_above_offset_m"] = float(normalized["high_above_offset_m"])
+    return normalized
+
+
+def _apply_argument_route_defaults(args):
+    if getattr(args, "return_route_squares", None) is None:
+        args.return_route_squares = []
+    else:
+        args.return_route_squares = list(args.return_route_squares)
+    if getattr(args, "route_above_offset_m", None) is None:
+        args.route_above_offset_m = float(args.high_above_offset_m)
+    else:
+        args.route_above_offset_m = float(args.route_above_offset_m)

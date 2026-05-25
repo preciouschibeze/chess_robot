@@ -126,6 +126,7 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
             saved_home["saved_home_tcp_world_xyz_m"],
             board_top,
             args,
+            return_route_targets=resolve_return_route_targets(context["scene_geometry"], board_top, args),
         )
 
         completed_segments = {}
@@ -166,7 +167,7 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
             bus.close()
 
 
-def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz, board_top_z, args):
+def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz, board_top_z, args, return_route_targets=None):
     current = np.asarray(current_world_xyz, dtype=float)
     square = np.asarray(square_world_xyz, dtype=float)
     home = np.asarray(saved_home_world_xyz, dtype=float)
@@ -181,12 +182,21 @@ def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz,
         make_world_segment("target_normal_above", [square[0], square[1], normal_z]),
     ]
     if bool(getattr(args, "return_home", False)):
-        plan.extend([
+        plan.append(
             make_return_world_segment(
                 "target_high_above_return",
                 [square[0], square[1], high_z],
                 "target_high_above",
-            ),
+            )
+        )
+        for route_target in list(return_route_targets or []):
+            plan.append(
+                make_route_world_segment(
+                    route_target["square"],
+                    route_target["target_world_xyz_m"],
+                )
+            )
+        plan.extend([
             make_return_world_segment(
                 "home_high",
                 [home[0], home[1], max(float(home[2]), transit_z)],
@@ -219,10 +229,19 @@ def make_return_world_segment(name, values, replay_source_segment):
     return segment
 
 
+def make_route_world_segment(square, values):
+    segment = make_world_segment("route_high_%s" % str(square).lower(), values)
+    segment["is_return_segment"] = True
+    segment["route_waypoint"] = True
+    segment["route_square"] = str(square).lower()
+    return segment
+
+
 def segment_uses_approach_preference(spec, args):
     if not bool(getattr(args, "prefer_vertical_approach", False)):
         return False
-    return str(spec.get("segment_name") or "").startswith("target_")
+    segment_name = str(spec.get("segment_name") or "")
+    return segment_name.startswith("target_") or bool(spec.get("route_waypoint"))
 
 
 def segment_uses_approach_enforcement(spec, args):
@@ -400,7 +419,8 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, complete
             path_validation.get("failure_reason") or "Board-clearance path validation failed.",
         ))
         segment["safety_checks"] = safety_checks
-        attach_approach_diagnostics(segment, context, args, joint_positions_rad, getattr(args, "square", None), segment_uses_approach_preference(spec, args), segment_uses_approach_enforcement(spec, args))
+        approach_square = spec.get("route_square") or getattr(args, "square", None)
+        attach_approach_diagnostics(segment, context, args, joint_positions_rad, approach_square, segment_uses_approach_preference(spec, args), segment_uses_approach_enforcement(spec, args))
 
         if segment.get("approach_enforced") and not bool(segment.get("approach_angle_check", {}).get("passed")):
             segment["abort_reason"] = segment.get("approach_angle_check", {}).get("failure_reason")
@@ -505,6 +525,8 @@ def base_segment_log(segment_index, spec, target_world, target_robot, current_ti
         "planned_target_ticks": {},
         "achieved_ticks": {},
         "achieved_ticks_available": False,
+        "route_square": spec.get("route_square"),
+        "route_waypoint": bool(spec.get("route_waypoint", False)),
         "current_ticks_before": arm_ticks_only(current_ticks),
         "final_ticks_after": None,
         "motion_deltas_ticks": {},
@@ -537,7 +559,6 @@ def base_segment_log(segment_index, spec, target_world, target_robot, current_ti
         "command_sent": False,
         "abort_reason": None,
     }
-
 
 
 def resolve_segment_settle_time(segment_name, args):
@@ -573,6 +594,8 @@ def build_transfer_log(args, context, timestamp, mode, board_top):
         "transit_clearance_m": float(args.transit_clearance_m),
         "normal_above_offset_m": float(args.normal_above_offset_m),
         "high_above_offset_m": float(args.high_above_offset_m),
+        "return_route_squares": list(getattr(args, "return_route_squares", []) or []),
+        "route_above_offset_m": float(args.route_above_offset_m),
         "return_home": bool(getattr(args, "return_home", False)),
         "return_strategy": str(getattr(args, "return_strategy", RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY)),
         "command_sent_any": False,
@@ -671,6 +694,19 @@ def square_center_world(scene_geometry, square):
         if center["square"] == requested:
             return [float(center["x_m"]), float(center["y_m"]), float(center["z_m"])]
     raise SafeTransferError("Unknown board square: %s" % square)
+
+
+def resolve_return_route_targets(scene_geometry, board_top_z, args):
+    route_targets = []
+    route_squares = list(getattr(args, "return_route_squares", []) or [])
+    route_z = float(board_top_z) + float(args.route_above_offset_m)
+    for square_name in route_squares:
+        square_world = square_center_world(scene_geometry, square_name)
+        route_targets.append({
+            "square": str(square_name).lower(),
+            "target_world_xyz_m": [float(square_world[0]), float(square_world[1]), float(route_z)],
+        })
+    return route_targets
 
 
 def xyz_list(values):

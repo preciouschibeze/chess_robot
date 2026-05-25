@@ -66,6 +66,17 @@ def collect_explicit_argument_dests(parser, args):
     return explicit_dests
 
 
+def parse_square_list(value):
+    if value is None:
+        return None
+    squares = []
+    for item in str(value).split(","):
+        normalized = item.strip().lower()
+        if normalized:
+            squares.append(normalized)
+    return squares
+
+
 def build_parser():
     parser = PolicyAwareArgumentParser(description="Validate a staged safe square-above transfer for the SO101 chess robot.")
     parser.add_argument("--urdf", default=DEFAULT_URDF_PATH, help="URDF model path.")
@@ -87,6 +98,7 @@ def build_parser():
 
     parser.add_argument("--normal-above-offset-m", type=float, default=0.080, help="Normal above-square height above board top.")
     parser.add_argument("--high-above-offset-m", type=float, default=0.120, help="High above-square height above board top.")
+    parser.add_argument("--route-above-offset-m", type=float, default=None, help="Route waypoint height above board top. Defaults to the high above-square height.")
     parser.add_argument("--transit-clearance-m", type=float, default=0.120, help="Lift height above board top for XY transit.")
     parser.add_argument("--board-clearance-m", type=float, default=0.060, help="Minimum TCP clearance above board top for XY-changing path samples.")
     parser.add_argument("--path-samples", type=int, default=25, help="Joint-interpolated FK path samples per segment.")
@@ -106,6 +118,7 @@ def build_parser():
     parser.add_argument("--execute", action="store_true", help="Command hardware after all segment checks.")
     parser.add_argument("--confirm", default=None, help="Typed execute confirmation.")
     parser.add_argument("--return-home", action="store_true", help="Return to saved home through high waypoints after reaching target normal-above.")
+    parser.add_argument("--return-route-squares", type=parse_square_list, default=None, help="Comma-separated high-clearance return route squares, for example a2,c3,e4.")
     parser.add_argument("--return-strategy", choices=(RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY, RETURN_STRATEGY_REVERSE_REPLAY, RETURN_STRATEGY_RESOLVE_NEW), default=RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY, help="How to build return segments after the forward target stages.")
     parser.add_argument("--allow-planned-replay-fallback", action="store_true", help="Allow planned-target replay when achieved readback ticks are unavailable for achieved reverse replay.")
     parser.set_defaults(assume_start_home=True)
@@ -152,6 +165,9 @@ def print_report(log, output_path):
     if log.get("resolved_policy") is not None:
         print("Resolved policy: %s" % json.dumps(log["resolved_policy"], sort_keys=True))
     print("Return strategy: %s" % log.get("return_strategy"))
+    route_squares = log.get("return_route_squares") or []
+    print("Return route squares: %s" % (", ".join(route_squares) if route_squares else "none"))
+    print("Route above offset m: %s" % format_optional_float(log.get("route_above_offset_m")))
     if log.get("locked_joints"):
         print("Locked joints: %s" % ", ".join(sorted(log["locked_joints"].keys())))
     print("Segments:")
@@ -174,6 +190,17 @@ def print_report(log, output_path):
                 segment.get("abort_reason") or "",
             )
         )
+        if segment.get("route_waypoint"):
+            print(
+                "     %s ik=%s path=%s min_z=%s route_square=%s"
+                % (
+                    segment["segment_name"],
+                    segment.get("ik_success"),
+                    path.get("passed"),
+                    format_optional_float(path.get("min_z_m")),
+                    segment.get("route_square") or "",
+                )
+            )
     if log.get("abort_reason"):
         print("Abort reason: %s" % log["abort_reason"])
     print("Command sent any: %s" % log.get("command_sent_any"))

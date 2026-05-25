@@ -113,6 +113,16 @@ def _passing_path(*args, **kwargs):
     }
 
 
+def _route_targets(route_squares, route_z):
+    targets = []
+    for square_name in route_squares:
+        targets.append({
+            "square": str(square_name).lower(),
+            "target_world_xyz_m": [0.0, 0.0, float(route_z)],
+        })
+    return targets
+
+
 def _write_seed_file(path, document):
     import yaml
 
@@ -233,6 +243,44 @@ def test_target_offsets_are_used_in_plan():
     assert plan[2]["target_world_xyz_m"][2] == 0.107
 
 
+def test_return_home_plan_inserts_route_segments_before_home_high():
+    args = _args("/tmp", ["--return-home", "--return-route-squares", "a2,c3,e4", "--route-above-offset-m", "0.140"])
+    plan = safe_transfer.build_staged_plan(
+        [0.0, 0.0, 0.050],
+        [0.2, 0.1, 0.026],
+        [0.0, 0.0, 0.050],
+        0.026,
+        args,
+        return_route_targets=_route_targets(args.return_route_squares, 0.166),
+    )
+    assert [item["segment_name"] for item in plan] == [
+        "current_lift",
+        "target_high_above",
+        "target_normal_above",
+        "target_high_above_return",
+        "route_high_a2",
+        "route_high_c3",
+        "route_high_e4",
+        "home_high",
+        "home_pose",
+    ]
+
+
+def test_route_segments_are_high_above_only():
+    args = _args("/tmp", ["--return-home", "--return-route-squares", "a2,c3", "--route-above-offset-m", "0.140"])
+    plan = safe_transfer.build_staged_plan(
+        [0.0, 0.0, 0.050],
+        [0.2, 0.1, 0.026],
+        [0.0, 0.0, 0.050],
+        0.026,
+        args,
+        return_route_targets=_route_targets(args.return_route_squares, 0.166),
+    )
+    route_segments = [item for item in plan if item["segment_name"].startswith("route_high_")]
+    assert [item["route_square"] for item in route_segments] == ["a2", "c3"]
+    assert [item["route_waypoint"] for item in route_segments] == [True, True]
+    assert [item["target_world_xyz_m"][2] for item in route_segments] == [0.166, 0.166]
+    assert not [item for item in plan if "route_normal" in item["segment_name"]]
 
 
 def test_old_settle_time_behavior_remains_for_all_segments(tmpdir, monkeypatch):
@@ -376,6 +424,57 @@ def test_path_validation_is_called_for_every_segment(tmpdir, monkeypatch):
     assert calls["count"] == 3
 
 
+def test_route_segments_run_path_validation(tmpdir, monkeypatch):
+    calls = {"count": 0}
+
+    def counting_path(*args, **kwargs):
+        calls["count"] += 1
+        return _passing_path(*args, **kwargs)
+
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", counting_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home", "--return-route-squares", "a2,c3", "--route-above-offset-m", "0.140"]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    assert len(log["segments"]) == 8
+    assert calls["count"] == 8
+    assert by_name["route_high_a2"]["route_waypoint"] is True
+    assert by_name["route_high_a2"]["path_validation"]["passed"] is True
+    assert by_name["route_high_c3"]["route_waypoint"] is True
+    assert by_name["route_high_c3"]["path_validation"]["passed"] is True
+
+
+def test_route_segment_abort_stops_later_segments(tmpdir, monkeypatch):
+    calls = {"count": 0}
+
+    def fifth_segment_fails(*args, **kwargs):
+        calls["count"] += 1
+        summary = _passing_path(*args, **kwargs)
+        if calls["count"] == 5:
+            summary["passed"] = False
+            summary["failure_reason"] = "synthetic route path failure"
+        return summary
+
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", fifth_segment_fails)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home", "--return-route-squares", "a2", "--route-above-offset-m", "0.140"]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert calls["count"] == 5
+    assert log["abort_reason"] == "synthetic route path failure"
+    assert [segment["segment_name"] for segment in log["segments"]] == [
+        "current_lift",
+        "target_high_above",
+        "target_normal_above",
+        "target_high_above_return",
+        "route_high_a2",
+    ]
+    assert log["segments"][-1]["route_waypoint"] is True
+
+
 def test_reverse_replay_reuses_forward_targets_and_skips_return_ik(tmpdir, monkeypatch):
     monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
     calls = []
@@ -499,6 +598,25 @@ def test_achieved_reverse_replay_dry_run_uses_planned_source_label(tmpdir, monke
     assert by_name["home_high"]["replay_source"] == "planned_target_ticks_dry_run"
     assert by_name["target_high_above_return"]["target_ticks"] == by_name["target_high_above"]["planned_target_ticks"]
     assert by_name["home_high"]["target_ticks"] == by_name["current_lift"]["planned_target_ticks"]
+
+
+def test_achieved_reverse_replay_still_replays_target_high_before_route(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--return-home",
+            "--return-route-squares", "a2,c3,e4",
+            "--route-above-offset-m", "0.140",
+            "--return-strategy", safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY,
+        ]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    assert by_name["target_high_above_return"]["replay_source"] == "planned_target_ticks_dry_run"
+    assert by_name["target_high_above_return"]["replayed_target_ticks"] is True
+    assert by_name["route_high_a2"]["replayed_target_ticks"] is False
+    assert by_name["route_high_a2"]["route_waypoint"] is True
 
 
 
@@ -657,7 +775,7 @@ def test_gripper_is_excluded_from_all_target_ticks(tmpdir, monkeypatch):
 
 def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
     monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
-    args = _args(tmpdir)
+    args = _args(tmpdir, ["--return-home", "--return-route-squares", "a2", "--route-above-offset-m", "0.140"])
     log = safe_transfer.run_safe_square_transfer(
         args,
         ik_solver=_home_solver,
@@ -665,6 +783,8 @@ def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
     )
     with open(args.output, "r") as handle:
         saved = json.load(handle)
+    assert saved["return_route_squares"] == ["a2"]
+    assert saved["route_above_offset_m"] == 0.14
     assert saved["segments"]
     required = [
         "segment_index",
@@ -681,6 +801,8 @@ def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
         "planned_target_ticks",
         "achieved_ticks",
         "achieved_ticks_available",
+        "route_square",
+        "route_waypoint",
         "current_ticks_before",
         "final_ticks_after",
         "motion_deltas_ticks",
@@ -698,6 +820,9 @@ def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
     ]
     for key in required:
         assert key in saved["segments"][0]
+    route_segment = [segment for segment in saved["segments"] if segment["segment_name"] == "route_high_a2"][0]
+    assert route_segment["route_square"] == "a2"
+    assert route_segment["route_waypoint"] is True
     assert log["segments"][0]["ik_success"] is True
 
 
@@ -773,8 +898,33 @@ def test_policy_resolved_json_is_saved_for_safe_transfer(tmpdir, monkeypatch):
     assert saved["policy_override_applied"] is True
     assert saved["resolved_policy"]["approach_axis_name"] == "plus_z"
     assert saved["resolved_policy"]["approach_weight"] == 0.02
+    assert saved["resolved_policy"]["return_route_squares"] == ["a2", "c3", "e4"]
+    assert saved["resolved_policy"]["route_above_offset_m"] == 0.14
     assert saved["resolved_policy"]["lock_wrist_roll_home"] is True
     assert log["command_sent_any"] is False
+
+
+def test_cli_return_route_override_wins_over_policy_for_safe_transfer(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    args = _args(tmpdir, [
+        "--square", "a1",
+        "--approach-policy", APPROACH_POLICY_PATH,
+        "--return-home",
+        "--return-route-squares", "h2,f3,e4",
+        "--route-above-offset-m", "0.150",
+    ])
+    log = safe_transfer.run_safe_square_transfer(
+        args,
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert log["return_route_squares"] == ["h2", "f3", "e4"]
+    assert log["route_above_offset_m"] == 0.15
+    assert [segment["segment_name"] for segment in log["segments"] if segment.get("route_waypoint")] == [
+        "route_high_h2",
+        "route_high_f3",
+        "route_high_e4",
+    ]
 
 
 def test_safe_transfer_applies_seed_only_to_square_segments(tmpdir, monkeypatch):

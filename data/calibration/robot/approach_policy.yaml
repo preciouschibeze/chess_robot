@@ -12,7 +12,9 @@ approach_policy:
 
     normal_above_offset_m: 0.080
     high_above_offset_m: 0.120
+    route_above_offset_m: 0.120
     transit_clearance_m: 0.120
+    return_route_squares: []
 
     # This is clearance above the board surface, not world Z.
     # Board top is about 0.026 m, so this gives low_zone_z ≈ 0.086 m.
@@ -25,20 +27,26 @@ approach_policy:
     a1:
       approach_weight: 0.02
       high_above_offset_m: 0.140
+      route_above_offset_m: 0.140
       transit_clearance_m: 0.140
+      return_route_squares: [a2, c3, e4]
       enforce_approach_angle: false
-      notes: "Far-rank corner; relaxed vertical approach and higher transit height required."
+      notes: "Far-rank corner; relaxed vertical approach, higher transit height, and routed return required."
 
     b1:
       approach_weight: 0.02
       high_above_offset_m: 0.140
+      route_above_offset_m: 0.140
       transit_clearance_m: 0.140
+      return_route_squares: [b2, c3, e4]
       enforce_approach_angle: false
-      notes: "Far-rank square; relaxed vertical approach and higher transit height required."
+      notes: "Far-rank square; relaxed vertical approach, higher transit height, and routed return required."
 
     h1:
       approach_weight: 0.02
       high_above_offset_m: 0.140
+      route_above_offset_m: 0.140
       transit_clearance_m: 0.140
+      return_route_squares: [h2, f3, e4]
       enforce_approach_angle: false
-      notes: "Far-rank corner; relaxed vertical approach and higher transit height required."
+      notes: "Far-rank corner; relaxed vertical approach, higher transit height, and routed return required."

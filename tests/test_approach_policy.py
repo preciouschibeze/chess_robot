@@ -66,16 +66,23 @@ def test_default_policy_loads_correctly():
     assert policy_document["default"]["high_above_offset_m"] == 0.12
     assert policy_document["default"]["transit_clearance_m"] == 0.12
     assert policy_document["default"]["board_clearance_m"] == 0.06
+    assert policy_document["default"]["return_route_squares"] == []
+    assert policy_document["default"]["route_above_offset_m"] == 0.12
     assert policy_document["default"]["lock_wrist_roll_home"] is True
 
 
-@pytest.mark.parametrize("square_name", ["a1", "b1", "h1"])
-def test_square_override_applies_for_relaxed_far_rank_squares(square_name):
+@pytest.mark.parametrize(
+    "square_name,expected_route",
+    [("a1", ["a2", "c3", "e4"]), ("b1", ["b2", "c3", "e4"]), ("h1", ["h2", "f3", "e4"])],
+)
+def test_square_override_applies_for_routed_far_rank_squares(square_name, expected_route):
     policy_info = resolve_approach_policy(load_approach_policy(POLICY_PATH), square_name)
     assert policy_info["policy_override_applied"] is True
     assert policy_info["resolved_policy"]["approach_axis_name"] == "plus_z"
     assert policy_info["resolved_policy"]["approach_weight"] == 0.02
     assert policy_info["resolved_policy"]["enforce_approach_angle"] is False
+    assert policy_info["resolved_policy"]["return_route_squares"] == expected_route
+    assert policy_info["resolved_policy"]["route_above_offset_m"] == 0.14
 
 
 def test_non_overridden_square_uses_default_policy_values():
@@ -83,6 +90,8 @@ def test_non_overridden_square_uses_default_policy_values():
     assert policy_info["policy_override_applied"] is False
     assert policy_info["resolved_policy"]["approach_weight"] == 0.05
     assert policy_info["resolved_policy"]["normal_above_offset_m"] == 0.08
+    assert policy_info["resolved_policy"]["return_route_squares"] == []
+    assert policy_info["resolved_policy"]["route_above_offset_m"] == 0.12
 
 
 def test_cli_approach_weight_override_wins_over_policy_default():
@@ -97,6 +106,25 @@ def test_cli_normal_above_offset_override_wins_over_policy_default():
     assert args.normal_above_offset_m == 0.095
     assert args.resolved_policy["normal_above_offset_m"] == 0.095
     assert args.policy_override_applied is False
+
+
+def test_cli_return_route_override_wins_over_policy_default():
+    args = _parse("a1", ["--approach-policy", POLICY_PATH, "--return-route-squares", "h2,f3,e4"])
+    assert args.return_route_squares == ["h2", "f3", "e4"]
+    assert args.resolved_policy["return_route_squares"] == ["h2", "f3", "e4"]
+
+
+def test_cli_route_above_offset_override_wins_over_policy_default():
+    args = _parse("a1", ["--approach-policy", POLICY_PATH, "--route-above-offset-m", "0.155"])
+    assert args.route_above_offset_m == 0.155
+    assert args.resolved_policy["route_above_offset_m"] == 0.155
+
+
+def test_cli_high_above_override_updates_default_route_offset_when_route_omitted():
+    args = _parse("e4", ["--approach-policy", POLICY_PATH, "--high-above-offset-m", "0.131"])
+    assert args.high_above_offset_m == 0.131
+    assert args.route_above_offset_m == 0.131
+    assert args.resolved_policy["route_above_offset_m"] == 0.131
 
 
 def test_missing_policy_file_gives_clear_error(capsys):
