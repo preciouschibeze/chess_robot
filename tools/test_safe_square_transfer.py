@@ -14,6 +14,7 @@ from chess_robot.robot.approach_policy import ApproachPolicyError
 from chess_robot.robot.approach_policy import apply_approach_policy
 from chess_robot.robot.safe_transfer import CONFIRM_TEXT
 from chess_robot.robot.safe_transfer import DEFAULT_CSV_LOG_PATH
+from chess_robot.robot.safe_transfer import RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY
 from chess_robot.robot.safe_transfer import RETURN_STRATEGY_RESOLVE_NEW
 from chess_robot.robot.safe_transfer import RETURN_STRATEGY_REVERSE_REPLAY
 from chess_robot.robot.safe_transfer import run_safe_square_transfer
@@ -105,7 +106,8 @@ def build_parser():
     parser.add_argument("--execute", action="store_true", help="Command hardware after all segment checks.")
     parser.add_argument("--confirm", default=None, help="Typed execute confirmation.")
     parser.add_argument("--return-home", action="store_true", help="Return to saved home through high waypoints after reaching target normal-above.")
-    parser.add_argument("--return-strategy", choices=(RETURN_STRATEGY_REVERSE_REPLAY, RETURN_STRATEGY_RESOLVE_NEW), default=RETURN_STRATEGY_REVERSE_REPLAY, help="How to build return segments after the forward target stages.")
+    parser.add_argument("--return-strategy", choices=(RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY, RETURN_STRATEGY_REVERSE_REPLAY, RETURN_STRATEGY_RESOLVE_NEW), default=RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY, help="How to build return segments after the forward target stages.")
+    parser.add_argument("--allow-planned-replay-fallback", action="store_true", help="Allow planned-target replay when achieved readback ticks are unavailable for achieved reverse replay.")
     parser.set_defaults(assume_start_home=True)
     parser.add_argument("--assume-start-home", dest="assume_start_home", action="store_true", help="Dry-run start state is saved home. Default true.")
     parser.add_argument("--no-assume-start-home", dest="assume_start_home", action="store_false", help="Reject dry-run until a non-home start source exists.")
@@ -156,11 +158,12 @@ def print_report(log, output_path):
     for segment in log.get("segments", []):
         path = segment.get("path_validation") or {}
         print(
-            "  %d. %s replay=%s ik=%s path=%s tilt=%s min_z=%s settle=%s seed=%s command=%s abort=%s"
+            "  %d. %s replay=%s source=%s ik=%s path=%s tilt=%s min_z=%s settle=%s seed=%s command=%s abort=%s"
             % (
                 int(segment["segment_index"]),
                 segment["segment_name"],
                 segment.get("replay_source_segment") or "-",
+                segment.get("replay_source") or "none",
                 segment.get("ik_success"),
                 path.get("passed"),
                 format_optional_float(segment.get("approach_tilt_deg")),

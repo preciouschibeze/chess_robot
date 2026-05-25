@@ -215,9 +215,9 @@ def test_return_home_plan_marks_reverse_replay_sources():
     assert by_name["home_pose"]["is_return_segment"] is True
 
 
-def test_return_strategy_defaults_to_reverse_replay():
+def test_return_strategy_defaults_to_achieved_reverse_replay():
     args = _args("/tmp")
-    assert args.return_strategy == safe_transfer.RETURN_STRATEGY_REVERSE_REPLAY
+    assert args.return_strategy == safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY
 
 
 def test_target_offsets_are_used_in_plan():
@@ -389,7 +389,7 @@ def test_reverse_replay_reuses_forward_targets_and_skips_return_ik(tmpdir, monke
         calls.append(call_index)
         return FakeIKResult(args[1], joint_positions_rad=_radians_from_ticks(ticks))
 
-    args = _args(tmpdir, ["--return-home"])
+    args = _args(tmpdir, ["--return-home", "--return-strategy", safe_transfer.RETURN_STRATEGY_REVERSE_REPLAY])
     log = safe_transfer.run_safe_square_transfer(
         args,
         ik_solver=recording_solver,
@@ -408,6 +408,8 @@ def test_reverse_replay_reuses_forward_targets_and_skips_return_ik(tmpdir, monke
     assert by_name["home_high"]["return_strategy"] == safe_transfer.RETURN_STRATEGY_REVERSE_REPLAY
     assert by_name["target_high_above_return"]["replayed_target_ticks"] is True
     assert by_name["home_high"]["replayed_target_ticks"] is True
+    assert by_name["target_high_above_return"]["replay_source"] == "planned_target_ticks"
+    assert by_name["home_high"]["replay_source"] == "planned_target_ticks"
     assert by_name["target_high_above_return"]["ik_status"] == "replayed_forward_target"
     assert by_name["home_high"]["ik_status"] == "replayed_forward_target"
     assert by_name["target_high_above_return"]["ik_iterations"] == 0
@@ -443,7 +445,130 @@ def test_resolve_new_preserves_return_ik_solving(tmpdir, monkeypatch):
 
 
 
-def test_reverse_replay_still_validates_return_paths(tmpdir, monkeypatch):
+def test_achieved_reverse_replay_execute_uses_achieved_ticks_and_skips_return_ik(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    calls = []
+
+    def recording_solver(*args, **kwargs):
+        del kwargs
+        call_index = len(calls) + 1
+        ticks = _home_ticks()
+        ticks["shoulder_pan"] = int(ticks["shoulder_pan"]) + (call_index * 10)
+        ticks["shoulder_lift"] = int(ticks["shoulder_lift"]) + (call_index * 20)
+        calls.append(call_index)
+        return FakeIKResult(args[1], joint_positions_rad=_radians_from_ticks(ticks))
+
+    bus = FakeBus(update_on_write=True)
+    args = _args(tmpdir, [
+        "--return-home",
+        "--execute",
+        "--confirm", safe_transfer.CONFIRM_TEXT,
+        "--return-strategy", safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY,
+    ])
+    log = safe_transfer.run_safe_square_transfer(
+        args,
+        bus_factory=_bus_factory(bus),
+        ik_solver=recording_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+        sleep_fn=lambda seconds: None,
+    )
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    assert len(calls) == 3
+    assert by_name["target_high_above"]["achieved_ticks_available"] is True
+    assert by_name["current_lift"]["achieved_ticks_available"] is True
+    assert by_name["target_high_above_return"]["target_ticks"] == by_name["target_high_above"]["achieved_ticks"]
+    assert by_name["home_high"]["target_ticks"] == by_name["current_lift"]["achieved_ticks"]
+    assert by_name["target_high_above_return"]["replay_source"] == "achieved_readback_ticks"
+    assert by_name["home_high"]["replay_source"] == "achieved_readback_ticks"
+    assert by_name["target_high_above_return"]["replayed_target_ticks"] is True
+    assert by_name["home_high"]["replayed_target_ticks"] is True
+    assert by_name["target_high_above_return"]["ik_status"] == "replayed_forward_target"
+    assert by_name["home_high"]["ik_status"] == "replayed_forward_target"
+
+
+
+def test_achieved_reverse_replay_dry_run_uses_planned_source_label(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--return-home", "--return-strategy", safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    assert by_name["target_high_above_return"]["replay_source"] == "planned_target_ticks_dry_run"
+    assert by_name["home_high"]["replay_source"] == "planned_target_ticks_dry_run"
+    assert by_name["target_high_above_return"]["target_ticks"] == by_name["target_high_above"]["planned_target_ticks"]
+    assert by_name["home_high"]["target_ticks"] == by_name["current_lift"]["planned_target_ticks"]
+
+
+
+def test_achieved_reverse_replay_aborts_if_achieved_ticks_are_missing(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    original_execute_segment = safe_transfer.execute_segment
+
+    def execute_without_achieved(segment, current_ticks, bus, servo_ids, args, sleep_fn):
+        result = original_execute_segment(segment, current_ticks, bus, servo_ids, args, sleep_fn)
+        if segment["segment_name"] in ("current_lift", "target_high_above"):
+            segment["achieved_ticks"] = {}
+            segment["achieved_ticks_available"] = False
+        return result
+
+    monkeypatch.setattr(safe_transfer, "execute_segment", execute_without_achieved)
+    bus = FakeBus(update_on_write=True)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--return-home",
+            "--execute",
+            "--confirm", safe_transfer.CONFIRM_TEXT,
+            "--return-strategy", safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY,
+        ]),
+        bus_factory=_bus_factory(bus),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+        sleep_fn=lambda seconds: None,
+    )
+    assert log["segments"][3]["segment_name"] == "target_high_above_return"
+    assert "no achieved readback ticks" in log["abort_reason"]
+    assert log["segments"][3]["command_sent"] is False
+
+
+
+def test_allow_planned_replay_fallback_uses_planned_ticks_when_achieved_missing(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    original_execute_segment = safe_transfer.execute_segment
+
+    def execute_without_achieved(segment, current_ticks, bus, servo_ids, args, sleep_fn):
+        result = original_execute_segment(segment, current_ticks, bus, servo_ids, args, sleep_fn)
+        if segment["segment_name"] in ("current_lift", "target_high_above"):
+            segment["achieved_ticks"] = {}
+            segment["achieved_ticks_available"] = False
+        return result
+
+    monkeypatch.setattr(safe_transfer, "execute_segment", execute_without_achieved)
+    bus = FakeBus(update_on_write=True)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--return-home",
+            "--execute",
+            "--confirm", safe_transfer.CONFIRM_TEXT,
+            "--return-strategy", safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY,
+            "--allow-planned-replay-fallback",
+        ]),
+        bus_factory=_bus_factory(bus),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+        sleep_fn=lambda seconds: None,
+    )
+    by_name = dict((segment["segment_name"], segment) for segment in log["segments"])
+    assert log["abort_reason"] is None
+    assert by_name["target_high_above_return"]["replay_source"] == "planned_target_ticks"
+    assert by_name["home_high"]["replay_source"] == "planned_target_ticks"
+    assert by_name["target_high_above_return"]["target_ticks"] == by_name["target_high_above"]["planned_target_ticks"]
+    assert by_name["home_high"]["target_ticks"] == by_name["current_lift"]["planned_target_ticks"]
+
+
+
+def test_achieved_reverse_replay_still_validates_return_paths(tmpdir, monkeypatch):
     calls = {"count": 0}
 
     def counting_path(*args, **kwargs):
@@ -452,7 +577,7 @@ def test_reverse_replay_still_validates_return_paths(tmpdir, monkeypatch):
 
     monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", counting_path)
     log = safe_transfer.run_safe_square_transfer(
-        _args(tmpdir, ["--return-home"]),
+        _args(tmpdir, ["--return-home", "--return-strategy", safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY]),
         ik_solver=_home_solver,
         now_fn=lambda: "2026-05-25T00:00:00Z",
     )
@@ -464,7 +589,7 @@ def test_reverse_replay_still_validates_return_paths(tmpdir, monkeypatch):
 
 
 
-def test_reverse_replay_path_failure_aborts_before_return_command(tmpdir, monkeypatch):
+def test_achieved_reverse_replay_path_failure_aborts_before_return_command(tmpdir, monkeypatch):
     calls = {"count": 0}
 
     def fourth_segment_fails(*args, **kwargs):
@@ -478,7 +603,7 @@ def test_reverse_replay_path_failure_aborts_before_return_command(tmpdir, monkey
     monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", fourth_segment_fails)
     bus = FakeBus(update_on_write=True)
     log = safe_transfer.run_safe_square_transfer(
-        _args(tmpdir, ["--return-home", "--execute", "--confirm", safe_transfer.CONFIRM_TEXT]),
+        _args(tmpdir, ["--return-home", "--execute", "--confirm", safe_transfer.CONFIRM_TEXT, "--return-strategy", safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY]),
         bus_factory=_bus_factory(bus),
         ik_solver=_home_solver,
         now_fn=lambda: "2026-05-25T00:00:00Z",
@@ -491,7 +616,7 @@ def test_reverse_replay_path_failure_aborts_before_return_command(tmpdir, monkey
 
 
 
-def test_reverse_replay_still_checks_motion_deltas(tmpdir, monkeypatch):
+def test_achieved_reverse_replay_still_checks_motion_deltas(tmpdir, monkeypatch):
     monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
     calls = {"count": 0}
 
@@ -505,10 +630,13 @@ def test_reverse_replay_still_checks_motion_deltas(tmpdir, monkeypatch):
         return deltas, checks
 
     monkeypatch.setattr(safe_transfer, "validate_motion_deltas", recording_motion_deltas)
+    bus = FakeBus(update_on_write=True)
     log = safe_transfer.run_safe_square_transfer(
-        _args(tmpdir, ["--return-home"]),
+        _args(tmpdir, ["--return-home", "--execute", "--confirm", safe_transfer.CONFIRM_TEXT, "--return-strategy", safe_transfer.RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY]),
+        bus_factory=_bus_factory(bus),
         ik_solver=_home_solver,
         now_fn=lambda: "2026-05-25T00:00:00Z",
+        sleep_fn=lambda seconds: None,
     )
     assert calls["count"] >= 4
     assert log["abort_reason"] == "synthetic replay delta failure"
@@ -550,6 +678,9 @@ def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
         "final_tcp_world_xyz_m",
         "final_tcp_robot_xyz_m",
         "target_ticks",
+        "planned_target_ticks",
+        "achieved_ticks",
+        "achieved_ticks_available",
         "current_ticks_before",
         "final_ticks_after",
         "motion_deltas_ticks",
@@ -559,6 +690,7 @@ def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
         "approach_tilt_deg",
         "return_strategy",
         "replay_source_segment",
+        "replay_source",
         "replayed_target_ticks",
         "settle_time_s",
         "command_sent",

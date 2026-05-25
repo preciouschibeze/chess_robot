@@ -69,6 +69,7 @@ SQUARE_IK_SEED_SEGMENTS = (
     "target_high_above_return",
 )
 RETURN_STRATEGY_REVERSE_REPLAY = "reverse_replay"
+RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY = "achieved_reverse_replay"
 RETURN_STRATEGY_RESOLVE_NEW = "resolve_new"
 
 
@@ -231,7 +232,11 @@ def segment_uses_approach_enforcement(spec, args):
 
 
 def resolve_return_replay_source(spec, args):
-    if str(getattr(args, "return_strategy", RETURN_STRATEGY_REVERSE_REPLAY)) != RETURN_STRATEGY_REVERSE_REPLAY:
+    strategy = str(getattr(args, "return_strategy", RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY))
+    if strategy not in (
+        RETURN_STRATEGY_REVERSE_REPLAY,
+        RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY,
+    ):
         return None
     replay_source_segment = spec.get("replay_source_segment")
     if replay_source_segment is None:
@@ -239,16 +244,51 @@ def resolve_return_replay_source(spec, args):
     return str(replay_source_segment)
 
 
-def resolve_replayed_target(replay_source_segment, completed_segments, context, execute_mode):
+def planned_target_ticks_for_segment(segment):
+    planned = arm_ticks_only(segment.get("planned_target_ticks") or {})
+    if len(planned) == len(ARM_JOINTS):
+        return planned
+    return arm_ticks_only(segment.get("target_ticks") or {})
+
+
+def achieved_target_ticks_for_segment(segment):
+    if not bool(segment.get("achieved_ticks_available")):
+        return {}
+    return arm_ticks_only(segment.get("achieved_ticks") or {})
+
+
+def resolve_replayed_target(replay_source_segment, completed_segments, context, args):
+    strategy = str(getattr(args, "return_strategy", RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY))
+    execute_mode = bool(args.execute)
     source_segment = completed_segments.get(replay_source_segment)
     if source_segment is None:
-        raise SafeTransferError("Reverse replay source segment was not found: %s" % replay_source_segment)
+        raise SafeTransferError("Replay source segment was not found: %s" % replay_source_segment)
+    if execute_mode and not bool(source_segment.get("command_sent")):
+        raise SafeTransferError("Replay source segment was not commanded in execute mode: %s" % replay_source_segment)
 
-    target_ticks = arm_ticks_only(source_segment.get("target_ticks") or {})
+    target_ticks = {}
+    replay_source = "none"
+    if strategy == RETURN_STRATEGY_REVERSE_REPLAY:
+        target_ticks = planned_target_ticks_for_segment(source_segment)
+        replay_source = "planned_target_ticks"
+    elif strategy == RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY:
+        if execute_mode:
+            target_ticks = achieved_target_ticks_for_segment(source_segment)
+            if len(target_ticks) == len(ARM_JOINTS):
+                replay_source = "achieved_readback_ticks"
+            elif bool(getattr(args, "allow_planned_replay_fallback", False)):
+                target_ticks = planned_target_ticks_for_segment(source_segment)
+                replay_source = "planned_target_ticks"
+            else:
+                raise SafeTransferError("Achieved replay source segment has no achieved readback ticks: %s" % replay_source_segment)
+        else:
+            target_ticks = planned_target_ticks_for_segment(source_segment)
+            replay_source = "planned_target_ticks_dry_run"
+    else:
+        raise SafeTransferError("Unsupported return replay strategy: %s" % strategy)
+
     if len(target_ticks) != len(ARM_JOINTS):
-        raise SafeTransferError("Reverse replay source segment has no complete target ticks: %s" % replay_source_segment)
-    if bool(execute_mode) and not bool(source_segment.get("command_sent")):
-        raise SafeTransferError("Reverse replay source segment was not commanded in execute mode: %s" % replay_source_segment)
+        raise SafeTransferError("Replay source segment has no complete target ticks: %s" % replay_source_segment)
 
     final_tcp_robot, final_tcp_world = tcp_from_ticks(context, target_ticks)
     joint_positions_rad = convert_pose_ticks_to_urdf_radians(target_ticks, context["calibration"])
@@ -257,6 +297,7 @@ def resolve_replayed_target(replay_source_segment, completed_segments, context, 
         "joint_positions_rad": joint_positions_rad,
         "final_tcp_robot": final_tcp_robot,
         "final_tcp_world": final_tcp_world,
+        "replay_source": replay_source,
         "result": {
             "success": bool(source_segment.get("ik_success")),
             "status": "replayed_forward_target",
@@ -272,7 +313,7 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, complete
     target_robot = world_point_to_robot_base(target_world, context["scene_geometry"])
     segment = base_segment_log(segment_index, spec, target_world, target_robot, current_ticks)
     if bool(spec.get("is_return_segment")):
-        segment["return_strategy"] = str(getattr(args, "return_strategy", RETURN_STRATEGY_REVERSE_REPLAY))
+        segment["return_strategy"] = str(getattr(args, "return_strategy", RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY))
     replay_source_segment = resolve_return_replay_source(spec, args)
     try:
         if replay_source_segment is not None:
@@ -280,7 +321,7 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, complete
                 replay_source_segment,
                 completed_segments,
                 context,
-                bool(args.execute),
+                args,
             )
             target_ticks = replay["target_ticks"]
             joint_positions_rad = replay["joint_positions_rad"]
@@ -295,6 +336,8 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, complete
                 "final_tcp_world_xyz_m": xyz_list(replay["final_tcp_world"]),
                 "final_tcp_robot_xyz_m": xyz_list(replay["final_tcp_robot"]),
                 "target_ticks": dict((joint, int(target_ticks[joint])) for joint in target_ticks),
+                "planned_target_ticks": dict((joint, int(target_ticks[joint])) for joint in target_ticks),
+                "replay_source": str(replay["replay_source"]),
                 "replayed_target_ticks": True,
             })
         else:
@@ -332,6 +375,7 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, complete
                 "final_tcp_world_xyz_m": xyz_list(final_tcp_world),
                 "final_tcp_robot_xyz_m": xyz_list(result.final_xyz_robot),
                 "target_ticks": dict((joint, int(target_ticks[joint])) for joint in target_ticks),
+                "planned_target_ticks": dict((joint, int(target_ticks[joint])) for joint in target_ticks),
             })
 
         safety_checks = build_static_safety_checks(
@@ -363,7 +407,7 @@ def evaluate_segment(segment_index, spec, current_ticks, context, args, complete
         elif replay_source_segment is None and not bool(segment["ik_success"]):
             segment["abort_reason"] = "IK failed: %s" % segment["ik_status"]
         elif replay_source_segment is not None and not bool(segment["ik_success"]):
-            segment["abort_reason"] = "Reverse replay source IK was not successful: %s" % replay_source_segment
+            segment["abort_reason"] = "Replay source IK was not successful: %s" % replay_source_segment
         elif not all_checks_ok(safety_checks):
             segment["abort_reason"] = first_failed_check_reason(safety_checks)
     except Exception as exc:
@@ -394,7 +438,12 @@ def execute_segment(segment, current_ticks, bus, servo_ids, args, sleep_fn):
         readback_checks = validate_readback(final_ticks, segment["target_ticks"], args.readback_tolerance_ticks)
         segment["safety_checks"].extend(readback_checks)
         segment["command_sent"] = bool(wrote_any)
-        if not all_checks_ok(readback_checks):
+        if all_checks_ok(readback_checks):
+            segment["achieved_ticks"] = arm_ticks_only(final_ticks)
+            segment["achieved_ticks_available"] = True
+        else:
+            segment["achieved_ticks"] = {}
+            segment["achieved_ticks_available"] = False
             segment["abort_reason"] = first_failed_check_reason(readback_checks)
     except Exception as exc:
         segment["abort_reason"] = str(exc)
@@ -453,6 +502,9 @@ def base_segment_log(segment_index, spec, target_world, target_robot, current_ti
         "final_tcp_world_xyz_m": None,
         "final_tcp_robot_xyz_m": None,
         "target_ticks": {},
+        "planned_target_ticks": {},
+        "achieved_ticks": {},
+        "achieved_ticks_available": False,
         "current_ticks_before": arm_ticks_only(current_ticks),
         "final_ticks_after": None,
         "motion_deltas_ticks": {},
@@ -479,6 +531,7 @@ def base_segment_log(segment_index, spec, target_world, target_robot, current_ti
         "ik_seed_joints_used": [],
         "return_strategy": str(spec.get("return_strategy")) if spec.get("return_strategy") is not None else None,
         "replay_source_segment": spec.get("replay_source_segment"),
+        "replay_source": "none",
         "replayed_target_ticks": False,
         "settle_time_s": float(spec["settle_time_s"]),
         "command_sent": False,
@@ -521,7 +574,7 @@ def build_transfer_log(args, context, timestamp, mode, board_top):
         "normal_above_offset_m": float(args.normal_above_offset_m),
         "high_above_offset_m": float(args.high_above_offset_m),
         "return_home": bool(getattr(args, "return_home", False)),
-        "return_strategy": str(getattr(args, "return_strategy", RETURN_STRATEGY_REVERSE_REPLAY)),
+        "return_strategy": str(getattr(args, "return_strategy", RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY)),
         "command_sent_any": False,
         "aborted": False,
         "abort_reason": None,
