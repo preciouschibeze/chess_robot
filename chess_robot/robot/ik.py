@@ -37,6 +37,8 @@ class IKResult(object):
             "seed_source": str(self.seed_source),
             "candidate_count": int(self.candidate_count),
             "joint_names": list(self.joint_names),
+            "optimized_joint_names": list(self.optimized_joint_names),
+            "locked_joints_rad": _mapping_to_float_dict(self.locked_joints_rad),
         }
 
 
@@ -51,6 +53,7 @@ def solve_position_ik(
     tolerance_m=0.005,
     damping=0.05,
     step_scale=1.0,
+    locked_joint_positions_rad=None,
 ):
     target_xyz_robot = _as_xyz(target_xyz_robot, "target_xyz_robot")
     max_iters = int(max_iters)
@@ -73,6 +76,16 @@ def solve_position_ik(
     )
     joint_vector = _joint_vector_from_input(seed_joint_positions_rad, joint_names)
     joint_vector = np.clip(joint_vector, lower_limits, upper_limits)
+    locked_joint_positions_rad = _normalise_locked_joint_positions(
+        locked_joint_positions_rad,
+        joint_names,
+    )
+    active_joint_indices = [
+        joint_index
+        for joint_index in range(len(joint_names))
+        if joint_names[joint_index] not in locked_joint_positions_rad
+    ]
+    joint_vector = _apply_locked_joint_positions(joint_vector, joint_names, locked_joint_positions_rad)
 
     status = "max_iters"
     success = False
@@ -99,6 +112,10 @@ def solve_position_ik(
         if iteration >= max_iters:
             break
 
+        if not active_joint_indices:
+            status = "locked_joints_fixed"
+            break
+
         jacobian = compute_position_jacobian(
             model,
             joint_map,
@@ -106,12 +123,17 @@ def solve_position_ik(
             end_link=end_link,
             tool_frame=tool_frame,
         )
-        damp_matrix = np.dot(jacobian, jacobian.T) + ((damping ** 2) * np.eye(3, dtype=float))
-        delta_q = np.dot(jacobian.T, np.linalg.solve(damp_matrix, error_xyz_robot))
+        active_jacobian = jacobian[:, active_joint_indices]
+        damp_matrix = np.dot(active_jacobian, active_jacobian.T) + ((damping ** 2) * np.eye(3, dtype=float))
+        delta_q = np.dot(active_jacobian.T, np.linalg.solve(damp_matrix, error_xyz_robot))
         if not np.isfinite(delta_q).all():
             status = "non_finite_step"
             break
-        joint_vector = np.clip(joint_vector + (step_scale * delta_q), lower_limits, upper_limits)
+        updated_joint_vector = np.asarray(joint_vector, dtype=float).copy()
+        for delta_index, joint_index in enumerate(active_joint_indices):
+            updated_joint_vector[joint_index] = updated_joint_vector[joint_index] + (step_scale * delta_q[delta_index])
+        joint_vector = np.clip(updated_joint_vector, lower_limits, upper_limits)
+        joint_vector = _apply_locked_joint_positions(joint_vector, joint_names, locked_joint_positions_rad)
 
     limit_margin_rad = _compute_limit_margins(joint_names, joint_vector, lower_limits, upper_limits)
     hit_limit_joints = [
@@ -145,6 +167,8 @@ def solve_position_ik(
         seed_source="single_seed",
         candidate_count=1,
         joint_names=joint_names,
+        optimized_joint_names=[joint_names[joint_index] for joint_index in active_joint_indices],
+        locked_joints_rad=locked_joint_positions_rad,
     )
 
 
@@ -163,6 +187,7 @@ def solve_position_ik_multi_seed(
     tolerance_m=0.005,
     damping=0.05,
     step_scale=1.0,
+    locked_joint_positions_rad=None,
 ):
     joint_names, lower_limits, upper_limits = _normalise_joint_limits(
         model,
@@ -204,6 +229,7 @@ def solve_position_ik_multi_seed(
         tolerance_m=tolerance_m,
         damping=damping,
         step_scale=step_scale,
+        locked_joint_positions_rad=locked_joint_positions_rad,
     )
     if best_success is not None:
         return best_success
@@ -230,6 +256,7 @@ def solve_position_ik_multi_seed(
         tolerance_m=tolerance_m,
         damping=damping,
         step_scale=step_scale,
+        locked_joint_positions_rad=locked_joint_positions_rad,
     )
     if random_success is not None:
         return random_success
@@ -400,6 +427,29 @@ def _compute_limit_margins(joint_names, joint_vector, lower_limits, upper_limits
     return margins
 
 
+def _normalise_locked_joint_positions(locked_joint_positions_rad, joint_names):
+    if locked_joint_positions_rad is None:
+        return {}
+    normalised = {}
+    valid_joint_names = set(joint_names)
+    for joint_name, value in locked_joint_positions_rad.items():
+        joint_name = str(joint_name)
+        if joint_name not in valid_joint_names:
+            raise ValueError("Locked joint %s is not part of this IK chain." % joint_name)
+        normalised[joint_name] = float(value)
+    return normalised
+
+
+def _apply_locked_joint_positions(joint_vector, joint_names, locked_joint_positions_rad):
+    if not locked_joint_positions_rad:
+        return np.asarray(joint_vector, dtype=float)
+    updated = np.asarray(joint_vector, dtype=float).copy()
+    for joint_index, joint_name in enumerate(joint_names):
+        if joint_name in locked_joint_positions_rad:
+            updated[joint_index] = float(locked_joint_positions_rad[joint_name])
+    return updated
+
+
 def _evaluate_seed_entries(
     seed_entries,
     model,
@@ -411,6 +461,7 @@ def _evaluate_seed_entries(
     tolerance_m,
     damping,
     step_scale,
+    locked_joint_positions_rad,
 ):
     best_success = None
     best_failure = None
@@ -426,6 +477,7 @@ def _evaluate_seed_entries(
             tolerance_m=tolerance_m,
             damping=damping,
             step_scale=step_scale,
+            locked_joint_positions_rad=locked_joint_positions_rad,
         )
         result.seed_source = str(seed_entry["source"])
         result.candidate_count = len(seed_entries)

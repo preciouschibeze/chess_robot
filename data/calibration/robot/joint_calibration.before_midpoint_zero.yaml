@@ -1,0 +1,24 @@
+joint_calibration:
+  ticks_per_rev: 4096
+  provisional: true
+  joints:
+    base_yaw:
+      urdf_joint: shoulder_pan
+      direction_sign: 1
+      zero_tick: 2098
+    shoulder_pitch:
+      urdf_joint: shoulder_lift
+      direction_sign: 1
+      zero_tick: 2028
+    elbow_pitch:
+      urdf_joint: elbow_flex
+      direction_sign: 1
+      zero_tick: 1939
+    wrist_pitch:
+      urdf_joint: wrist_flex
+      direction_sign: 1
+      zero_tick: 2248
+    wrist_roll:
+      urdf_joint: wrist_roll
+      direction_sign: 1
+      zero_tick: 2297

@@ -8,15 +8,15 @@ joint_preferences:
       weight: 0.1
 
     shoulder_lift:
-      preferred_tick: 895
+      preferred_tick: 1776
       weight: 0.2
 
     elbow_flex:
-      preferred_tick: 3030
+      preferred_tick: 2321
       weight: 0.2
 
     wrist_flex:
-      preferred_tick: 1905
+      preferred_tick: 2619
       weight: 0.5
       preferred_range_ticks: [1145, 2935]
 

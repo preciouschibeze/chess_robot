@@ -18,6 +18,7 @@ from chess_robot.robot.ik import robot_base_point_to_world
 from chess_robot.robot.ik import solve_position_ik
 from chess_robot.robot.ik import solve_position_ik_multi_seed
 from chess_robot.robot.ik import world_point_to_robot_base
+from chess_robot.robot.joint_calibration import angle_rad_to_tick
 from chess_robot.robot.joint_calibration import convert_pose_ticks_to_urdf_radians
 from chess_robot.robot.joint_calibration import load_joint_calibration
 from chess_robot.robot.joint_calibration import load_joint_limits
@@ -140,7 +141,7 @@ def test_gripper_is_excluded_from_ik_outputs():
     assert sorted(result.joint_positions_rad.keys()) == sorted(EXPECTED_ARM_JOINT_NAMES)
 
 
-def test_legacy_and_safety_joint_limit_bounds_currently_match():
+def test_legacy_and_safety_joint_limit_bounds_are_valid_profiles():
     model = load_urdf_model(URDF_PATH)
     calibration = load_joint_calibration(JOINT_CALIBRATION_PATH)
     legacy_joint_limits = load_joint_limits(JOINT_LIMITS_PATH)
@@ -159,5 +160,32 @@ def test_legacy_and_safety_joint_limit_bounds_currently_match():
 
     assert legacy_bounds["software_profile_kind"] == "legacy"
     assert safety_bounds["software_profile_kind"] == "safety"
-    assert np.allclose(legacy_bounds["lower_limits"], safety_bounds["lower_limits"])
-    assert np.allclose(legacy_bounds["upper_limits"], safety_bounds["upper_limits"])
+    assert legacy_bounds["lower_limits"].shape == safety_bounds["lower_limits"].shape
+    assert legacy_bounds["upper_limits"].shape == safety_bounds["upper_limits"].shape
+    assert np.all(legacy_bounds["lower_limits"] <= legacy_bounds["upper_limits"])
+    assert np.all(safety_bounds["lower_limits"] <= safety_bounds["upper_limits"])
+
+
+def test_locked_wrist_roll_stays_at_saved_home_and_is_removed_from_optimisation_variables():
+    model, scene_geometry, calibration, home_joint_positions, tool_frame, joint_limit_bounds = load_common_context()
+    targets = generate_targets(scene_geometry, above_board_offset_m=0.080, pick_offset_m=0.030)
+    d4_above = [target for target in targets if target["target_name"] == "d4_above"][0]
+    target_robot = world_point_to_robot_base(
+        np.asarray((d4_above["x_m"], d4_above["y_m"], d4_above["z_m"]), dtype=float),
+        scene_geometry,
+    )
+    locked = {"wrist_roll": home_joint_positions["wrist_roll"]}
+    result = solve_position_ik_multi_seed(
+        model,
+        target_robot,
+        joint_limit_bounds,
+        tool_frame=tool_frame,
+        home_joint_positions_rad=home_joint_positions,
+        random_seeds=5,
+        seed=7,
+        locked_joint_positions_rad=locked,
+    )
+    assert "wrist_roll" not in result.optimized_joint_names
+    assert abs(result.joint_positions_rad["wrist_roll"] - home_joint_positions["wrist_roll"]) <= 1.0e-12
+    assert result.locked_joints_rad["wrist_roll"] == locked["wrist_roll"]
+    assert angle_rad_to_tick("wrist_roll", result.joint_positions_rad["wrist_roll"], calibration) == 1091

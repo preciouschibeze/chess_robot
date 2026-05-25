@@ -1,6 +1,6 @@
 safety_limits:
-  source: manual_recalibration_required
-  calibrated: false
+  source: manual_recalibration
+  calibrated: true
   notes: "Broad hard software safety limits. Must remain inside mechanical and EEPROM limits."
 
   joints:

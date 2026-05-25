@@ -11,7 +11,7 @@ scene:
     size_m: [0.036, 0.025, 0.05]  # structure size estimate
 
   chessboard:
-    xyz_m: [0.003, 0.220, 0.026]  # centre
+    xyz_m: [0.003, 0.2515, 0.026]  # centre
     size_m: 0.252                 # square-to-square width including gap
     height_m: 0.026
 

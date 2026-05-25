@@ -32,7 +32,7 @@ def test_joint_safety_limit_loader_accepts_new_schema():
     joint_safety_limits = load_joint_safety_limits(JOINT_SAFETY_LIMITS_PATH)
     shoulder_pan = joint_safety_limits["joints"]["shoulder_pan"]
     assert joint_safety_limits["profile_kind"] == "safety"
-    assert joint_safety_limits["calibrated"] is False
+    assert joint_safety_limits["calibrated"] is True
     assert shoulder_pan["min_tick"] == 876
     assert shoulder_pan["max_tick"] == 3078
     assert shoulder_pan["status"] == "copied_from_previous_joint_limits_until_recalibrated"

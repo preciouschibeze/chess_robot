@@ -1,24 +1,35 @@
 joint_calibration:
-  ticks_per_rev: 4096
-  provisional: true
+  calibration_method: manual_robot_alignment_to_urdf_zero_pose
   joints:
     base_yaw:
+      direction_sign: 1
       urdf_joint: shoulder_pan
-      direction_sign: 1
-      zero_tick: 2098
-    shoulder_pitch:
-      urdf_joint: shoulder_lift
-      direction_sign: 1
-      zero_tick: 2028
+      zero_tick: 2075
+      zero_tick_note: "Physical robot manually aligned to CAD/URDF all-zero pose."
+      zero_tick_source: manual_robot_alignment_to_urdf_zero_pose
     elbow_pitch:
+      direction_sign: 1
       urdf_joint: elbow_flex
+      zero_tick: 1996
+      zero_tick_note: "Physical robot manually aligned to CAD/URDF all-zero pose."
+      zero_tick_source: manual_robot_alignment_to_urdf_zero_pose
+    shoulder_pitch:
       direction_sign: 1
-      zero_tick: 1939
+      urdf_joint: shoulder_lift
+      zero_tick: 2091
+      zero_tick_note: "Physical robot manually aligned to CAD/URDF all-zero pose."
+      zero_tick_source: manual_robot_alignment_to_urdf_zero_pose
     wrist_pitch:
+      direction_sign: 1
       urdf_joint: wrist_flex
-      direction_sign: 1
-      zero_tick: 2248
+      zero_tick: 2003
+      zero_tick_note: "Physical robot manually aligned to CAD/URDF all-zero pose."
+      zero_tick_source: manual_robot_alignment_to_urdf_zero_pose
     wrist_roll:
-      urdf_joint: wrist_roll
       direction_sign: 1
-      zero_tick: 2297
+      urdf_joint: wrist_roll
+      zero_tick: 2116
+      zero_tick_note: "Physical robot manually aligned to CAD/URDF all-zero pose."
+      zero_tick_source: manual_robot_alignment_to_urdf_zero_pose
+  provisional: true
+  ticks_per_rev: 4096

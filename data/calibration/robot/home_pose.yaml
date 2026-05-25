@@ -1,4 +1,4 @@
-created_at_utc: "2026-05-19T06:05:03Z"
+created_at_utc: "2026-05-24T14:42:32Z"
 notes: ""
 source: "live_read"
 joints:
@@ -7,13 +7,13 @@ joints:
     position: 1074
   shoulder_lift:
     id: 2
-    position: 894
+    position: 1776
   elbow_flex:
     id: 3
-    position: 3035
+    position: 2321
   wrist_flex:
     id: 4
-    position: 2828
+    position: 2619
   wrist_roll:
     id: 5
     position: 1091

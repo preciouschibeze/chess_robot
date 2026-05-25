@@ -32,6 +32,8 @@ def load_tool_frames(path):
             "parent_link": str(raw_frame.get("parent_link") or DEFAULT_END_LINK),
             "xyz_m": _as_float_vector(raw_frame.get("xyz_m", (0.0, 0.0, 0.0)), "xyz_m"),
             "rpy_deg": _as_float_vector(raw_frame.get("rpy_deg", (0.0, 0.0, 0.0)), "rpy_deg"),
+            "approach_axis_local": _as_float_vector(raw_frame.get("approach_axis_local", (0.0, 0.0, -1.0)), "approach_axis_local"),
+            "approach_axis_local_defaulted": raw_frame.get("approach_axis_local") is None,
             "notes": str(raw_frame.get("notes") or ""),
         }
 
@@ -103,6 +105,8 @@ def describe_tool_frame(tool_frame, fallback_name=DEFAULT_END_LINK):
         "tcp_frame": str(tool_frame.get("name") or fallback_name),
         "tool_offset_xyz_m": [float(value) for value in np.asarray(tool_frame["xyz_m"], dtype=float)],
         "tool_offset_rpy_deg": [float(value) for value in np.asarray(tool_frame["rpy_deg"], dtype=float)],
+        "approach_axis_local": [float(value) for value in np.asarray(tool_frame["approach_axis_local"], dtype=float)],
+        "approach_axis_local_defaulted": bool(tool_frame.get("approach_axis_local_defaulted", False)),
     }
 
 

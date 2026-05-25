@@ -6,16 +6,19 @@ tool_frames:
       parent_link: gripper_frame_link
       xyz_m: [0.0, 0.0, 0.0]
       rpy_deg: [0.0, 0.0, 0.0]
+      approach_axis_local: [0.0, 0.0, -1.0]
       notes: "Nominal URDF gripper frame. Zero-offset TCP."
 
     fixed_jaw_contact:
       parent_link: gripper_frame_link
       xyz_m: [0.0, 0.0, 0.0]
       rpy_deg: [0.0, 0.0, 0.0]
+      approach_axis_local: [0.0, 0.0, -1.0]
       notes: "Placeholder for inner contact surface of the fixed jaw. Fill after measurement."
 
     held_piece_center:
       parent_link: gripper_frame_link
       xyz_m: [0.0, 0.0, 0.0]
       rpy_deg: [0.0, 0.0, 0.0]
+      approach_axis_local: [0.0, 0.0, -1.0]
       notes: "Placeholder for estimated centre of a held chess piece relative to gripper frame."
