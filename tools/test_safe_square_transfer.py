@@ -13,6 +13,7 @@ if REPO_ROOT not in sys.path:
 from chess_robot.robot.approach_policy import ApproachPolicyError
 from chess_robot.robot.approach_policy import apply_approach_policy
 from chess_robot.robot.safe_transfer import CONFIRM_TEXT
+from chess_robot.robot.safe_transfer import CONFIRM_TEXT_AUTO_RECOVER
 from chess_robot.robot.safe_transfer import DEFAULT_CSV_LOG_PATH
 from chess_robot.robot.safe_transfer import RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY
 from chess_robot.robot.safe_transfer import RETURN_STRATEGY_RESOLVE_NEW
@@ -123,6 +124,10 @@ def build_parser():
     parser.add_argument("--confirm", default=None, help="Typed execute confirmation.")
     parser.add_argument("--return-home", action="store_true", help="Return to saved home through high waypoints after reaching target normal-above.")
     parser.add_argument("--return-route-squares", type=parse_square_list, default=None, help="Comma-separated high-clearance return route squares, for example a2,c3,e4.")
+    parser.add_argument("--auto-recover-on-abort", action="store_true", help="After an aborted execute with partial motion, run a validated recovery-to-home sequence.")
+    parser.add_argument("--recovery-clearance-m", type=float, default=0.160, help="Minimum recovery height above board top for return-home recovery waypoints.")
+    parser.add_argument("--recovery-route-squares", type=parse_square_list, default=None, help="Optional comma-separated recovery route squares, for example e4 or a2,c3,e4.")
+    parser.add_argument("--recovery-output", default=None, help="Optional JSON path for recovery dry-run/execute details.")
     parser.add_argument("--return-strategy", choices=(RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY, RETURN_STRATEGY_REVERSE_REPLAY, RETURN_STRATEGY_RESOLVE_NEW), default=RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY, help="How to build return segments after the forward target stages.")
     parser.add_argument("--allow-planned-replay-fallback", action="store_true", help="Allow planned-target replay when achieved readback ticks are unavailable for achieved reverse replay.")
     parser.set_defaults(assume_start_home=True)
@@ -155,7 +160,7 @@ def build_parser():
     return parser
 
 
-def print_report(log, output_path):
+def print_report(log, output_path, args):
     print("Mode: %s" % log["mode"])
     print("Square: %s" % log["square"])
     print("Approach policy path: %s" % (log.get("approach_policy_path") or "none"))
@@ -210,9 +215,20 @@ def print_report(log, output_path):
             )
     if log.get("abort_reason"):
         print("Abort reason: %s" % log["abort_reason"])
+    if log.get("recovery_needed") is not None:
+        print("Recovery needed: %s" % log.get("recovery_needed"))
+    if log.get("recovery_available") is not None:
+        print("Recovery available: %s" % log.get("recovery_available"))
+    if log.get("recovery_suggestion"):
+        print("Recovery command:")
+        print(log.get("recovery_suggestion"))
+    recovery_result = log.get("recovery_result") or {}
+    if recovery_result.get("abort_reason") == "Recovery unavailable: current servo readback failed.":
+        print("Recovery unavailable: current servo readback failed.")
     print("Command sent any: %s" % log.get("command_sent_any"))
     print("Saved JSON log: %s" % output_path)
-    print("Execute confirmation phrase: %s" % CONFIRM_TEXT)
+    expected_confirm = CONFIRM_TEXT_AUTO_RECOVER if bool(getattr(args, "auto_recover_on_abort", False)) else CONFIRM_TEXT
+    print("Execute confirmation phrase: %s" % expected_confirm)
 
 
 def format_optional_float(value):
@@ -224,7 +240,7 @@ def format_optional_float(value):
 def main():
     args = build_parser().parse_args()
     log = run_safe_square_transfer(args)
-    print_report(log, args.output)
+    print_report(log, args.output, args)
     if log.get("abort_reason"):
         return 2
     return 0

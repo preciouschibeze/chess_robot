@@ -49,6 +49,7 @@ from chess_robot.robot.urdf_model import DEFAULT_END_LINK
 
 
 CONFIRM_TEXT = "EXECUTE_SAFE_SQUARE_TRANSFER"
+CONFIRM_TEXT_AUTO_RECOVER = "EXECUTE_SAFE_SQUARE_TRANSFER_AND_AUTO_RECOVER"
 DEFAULT_CSV_LOG_PATH = os.path.join("data", "logs", "safe_square_transfer_validation.csv")
 CSV_FIELDNAMES = (
     "timestamp",
@@ -141,8 +142,9 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
     if not bool(args.execute) and not bool(getattr(args, "assume_start_home", True)):
         set_transfer_abort(log, "Dry-run mode currently requires --assume-start-home.")
         return finish_transfer_log(args, log)
-    if bool(args.execute) and args.confirm != CONFIRM_TEXT:
-        set_transfer_abort(log, "Execute mode requires --confirm %s." % CONFIRM_TEXT)
+    required_confirm_text = CONFIRM_TEXT_AUTO_RECOVER if bool(getattr(args, "auto_recover_on_abort", False)) else CONFIRM_TEXT
+    if bool(args.execute) and args.confirm != required_confirm_text:
+        set_transfer_abort(log, "Execute mode requires --confirm %s." % required_confirm_text)
         return finish_transfer_log(args, log)
     if bool(getattr(args, "enforce_piece_aware_high", False)) and not piece_aware_high_passed:
         set_transfer_abort(
@@ -210,9 +212,11 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
             else:
                 current_ticks = dict(segment["target_ticks"])
 
+        handle_abort_recovery(log, args, context, board_top, saved_home, bus, config, servo_ids, now_fn, sleep_fn, ik_solver)
         return finish_transfer_log(args, log)
     except Exception as exc:
         set_transfer_abort(log, str(exc))
+        handle_abort_recovery(log, args, context, board_top, saved_home, bus, config, servo_ids, now_fn, sleep_fn, ik_solver)
         return finish_transfer_log(args, log)
     finally:
         if bus is not None:
@@ -664,6 +668,11 @@ def build_transfer_log(args, context, timestamp, mode, board_top, transfer_behav
         "route_above_offset_m": float(args.route_above_offset_m),
         "return_home": bool(transfer_behavior["return_home"]),
         "return_strategy": str(getattr(args, "return_strategy", RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY)),
+        "recovery_needed": False,
+        "recovery_available": None,
+        "recovery_suggestion": None,
+        "recovery_output": derive_recovery_output_path(args),
+        "recovery_result": None,
         "command_sent_any": False,
         "aborted": False,
         "abort_reason": None,
@@ -761,6 +770,149 @@ def square_center_world(scene_geometry, square):
             return [float(center["x_m"]), float(center["y_m"]), float(center["z_m"])]
     raise SafeTransferError("Unknown board square: %s" % square)
 
+
+
+def handle_abort_recovery(log, args, context, board_top, saved_home, bus, config, servo_ids, now_fn, sleep_fn, ik_solver):
+    if not bool(log.get("abort_reason")):
+        return log
+    if not bool(getattr(args, "execute", False)):
+        log["recovery_needed"] = False
+        log["recovery_available"] = False
+        return log
+
+    command_sent_any = any(bool(segment.get("command_sent")) for segment in log.get("segments", []))
+    log["command_sent_any"] = bool(command_sent_any)
+    log["recovery_needed"] = bool(command_sent_any)
+    if not bool(command_sent_any):
+        log["recovery_available"] = False
+        return log
+
+    from chess_robot.robot import safe_recovery
+
+    default_route_squares = []
+    if getattr(args, "return_route_squares", None):
+        default_route_squares = list(args.return_route_squares)
+    elif getattr(args, "resolved_policy", None):
+        default_route_squares = list((args.resolved_policy or {}).get("return_route_squares") or [])
+
+    recovery_route_squares = safe_recovery.resolve_recovery_route_squares(
+        args,
+        default_route_squares=default_route_squares,
+    )
+    recovery_output_path = derive_recovery_output_path(args)
+    log["recovery_output"] = recovery_output_path
+    log["recovery_suggestion"] = build_recovery_suggestion_command(
+        args,
+        recovery_output_path,
+        recovery_route_squares,
+    )
+
+    try:
+        if servo_ids is None:
+            servo_ids = arm_servo_ids(config)
+        current_ticks = read_current_ticks(bus, servo_ids)
+    except Exception:
+        log["recovery_available"] = False
+        log["recovery_result"] = {
+            "mode": "dry_run",
+            "recovery_needed": True,
+            "recovery_available": False,
+            "abort_reason": safe_recovery.RECOVERY_READBACK_FAILURE_MESSAGE,
+            "segments": [],
+            "command_sent_any": False,
+            "aborted": True,
+        }
+        return log
+
+    preview_namespace = type("RecoveryArgs", (object,), {})()
+    for key, value in vars(args).items():
+        setattr(preview_namespace, key, value)
+    preview_namespace.execute = False
+    preview_namespace.confirm = None
+    preview_namespace.output = recovery_output_path
+    preview_namespace.recovery_route_squares = list(recovery_route_squares)
+
+    preview = safe_recovery.run_safe_recovery(
+        preview_namespace,
+        context=context,
+        board_top=board_top,
+        saved_home=saved_home,
+        bus=bus,
+        config=config,
+        servo_ids=servo_ids,
+        now_fn=now_fn,
+        sleep_fn=sleep_fn,
+        ik_solver=ik_solver,
+        force_current_ticks=current_ticks,
+        require_confirm=False,
+    )
+    log["recovery_result"] = preview
+    log["recovery_available"] = bool(not preview.get("aborted"))
+
+    if not bool(getattr(args, "auto_recover_on_abort", False)):
+        return log
+    if not bool(log.get("recovery_available")):
+        return log
+
+    execute_namespace = type("RecoveryArgs", (object,), {})()
+    for key, value in vars(args).items():
+        setattr(execute_namespace, key, value)
+    execute_namespace.execute = True
+    execute_namespace.confirm = safe_recovery.CONFIRM_TEXT_RECOVER_HOME
+    execute_namespace.output = recovery_output_path
+    execute_namespace.recovery_route_squares = list(recovery_route_squares)
+
+    execute_result = safe_recovery.run_safe_recovery(
+        execute_namespace,
+        context=context,
+        board_top=board_top,
+        saved_home=saved_home,
+        bus=bus,
+        config=config,
+        servo_ids=servo_ids,
+        now_fn=now_fn,
+        sleep_fn=sleep_fn,
+        ik_solver=ik_solver,
+        require_confirm=False,
+    )
+    log["recovery_result"] = execute_result
+    log["recovery_available"] = bool(not execute_result.get("aborted"))
+    return log
+
+
+def derive_recovery_output_path(args):
+    value = getattr(args, "recovery_output", None)
+    if value:
+        return str(value)
+    output_path = str(getattr(args, "output", "") or "")
+    if not output_path:
+        return os.path.join("data", "debug", "safe_transfer_recovery.json")
+    root, ext = os.path.splitext(output_path)
+    if ext:
+        return root + "_recovery" + ext
+    return output_path + "_recovery.json"
+
+
+def build_recovery_suggestion_command(args, recovery_output_path, recovery_route_squares):
+    route = ",".join([str(square).lower() for square in list(recovery_route_squares or [])])
+    command = [
+        "python3 tools/recover_home.py",
+        "  --urdf %s" % str(args.urdf),
+        "  --scene %s" % str(args.scene),
+        "  --joint-calibration %s" % str(args.joint_calibration),
+        "  --joint-safety-limits %s" % str(args.joint_safety_limits),
+        "  --home-pose %s" % str(args.home_pose),
+        "  --tool-frames %s" % str(args.tool_frames),
+        "  --tcp-frame %s" % str(args.tcp_frame),
+    ]
+    if getattr(args, "approach_policy", None):
+        command.append("  --approach-policy %s" % str(args.approach_policy))
+    command.extend([
+        "  --recovery-clearance-m %.3f" % float(getattr(args, "recovery_clearance_m", 0.160)),
+        "  --recovery-route-squares %s" % (route or "e4"),
+        "  --output %s" % str(recovery_output_path),
+    ])
+    return "\n".join(command)
 
 def resolve_return_route_targets(scene_geometry, board_top_z, transfer_behavior, args):
     route_targets = []

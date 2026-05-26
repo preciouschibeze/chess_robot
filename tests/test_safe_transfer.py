@@ -399,6 +399,43 @@ def test_execute_without_confirm_aborts_before_hardware(tmpdir):
     assert log["command_sent_any"] is False
 
 
+def test_abort_before_any_command_has_no_recovery_needed(tmpdir):
+    def forbidden_bus_factory(args):
+        del args
+        raise AssertionError("confirmation failure must not open hardware")
+
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--execute"]),
+        bus_factory=forbidden_bus_factory,
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert log["command_sent_any"] is False
+    assert log["recovery_needed"] is False
+    assert not log.get("recovery_suggestion")
+
+
+
+def test_auto_recovery_requires_stronger_confirmation_phrase(tmpdir):
+    def forbidden_bus_factory(args):
+        del args
+        raise AssertionError("confirmation failure must not open hardware")
+
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--execute",
+            "--auto-recover-on-abort",
+            "--confirm", safe_transfer.CONFIRM_TEXT,
+        ]),
+        bus_factory=forbidden_bus_factory,
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert "EXECUTE_SAFE_SQUARE_TRANSFER_AND_AUTO_RECOVER" in log["abort_reason"]
+    assert log["segments"] == []
+    assert log["command_sent_any"] is False
+
+
 def test_segment_execution_stops_after_failed_validation(tmpdir, monkeypatch):
     calls = {"count": 0}
 
@@ -1182,3 +1219,70 @@ def test_output_json_contains_ik_seed_metadata(tmpdir, monkeypatch):
     assert saved["segments"][1]["ik_seed_source"] == "square_seed_pose"
     assert "wrist_roll" in saved["segments"][1]["ik_seed_joints_used"]
     assert log["segments"][1]["ik_seed_ticks_used"]["wrist_roll"] == _home_ticks()["wrist_roll"]
+
+
+def test_abort_after_partial_command_sets_recovery_needed_and_suggestion(tmpdir, monkeypatch):
+    calls = {"count": 0}
+
+    def second_segment_fails(*args, **kwargs):
+        calls["count"] += 1
+        summary = _passing_path(*args, **kwargs)
+        if calls["count"] == 2:
+            summary["passed"] = False
+            summary["failure_reason"] = "synthetic unsafe path"
+        return summary
+
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", second_segment_fails)
+    bus = FakeBus(update_on_write=True)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--execute",
+            "--confirm", safe_transfer.CONFIRM_TEXT,
+            "--recovery-route-squares", "e4",
+        ]),
+        bus_factory=_bus_factory(bus),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+        sleep_fn=lambda seconds: None,
+    )
+    assert log["abort_reason"] == "synthetic unsafe path"
+    assert log["command_sent_any"] is True
+    assert log["recovery_needed"] is True
+    assert "tools/recover_home.py" in (log.get("recovery_suggestion") or "")
+    assert log.get("recovery_result") is not None
+
+
+
+def test_recovery_unavailable_when_readback_fails_after_partial_motion(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+
+    class ReadbackFailBus(FakeBus):
+        def __init__(self, *args, **kwargs):
+            FakeBus.__init__(self, *args, **kwargs)
+            self.read_calls = 0
+
+        def read_position(self, servo_id):
+            self.read_calls += 1
+            if self.read_calls > 15:
+                return None
+            return FakeBus.read_position(self, servo_id)
+
+    bus = ReadbackFailBus(update_on_write=True)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--execute",
+            "--confirm", safe_transfer.CONFIRM_TEXT,
+            "--readback-tolerance-ticks", "10",
+            "--recovery-route-squares", "e4",
+        ]),
+        bus_factory=_bus_factory(bus),
+        ik_solver=_shifted_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+        sleep_fn=lambda seconds: None,
+    )
+    assert log["command_sent_any"] is True
+    assert log["recovery_needed"] is True
+    assert log["recovery_available"] is False
+    recovery_result = log.get("recovery_result") or {}
+    assert recovery_result.get("abort_reason") == "Recovery unavailable: current servo readback failed."
+
