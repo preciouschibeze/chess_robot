@@ -55,6 +55,7 @@ def _args(tmpdir, extra=None):
         "--workspace-seed-samples", "0",
         "--output", output,
         "--csv-log", csv_log,
+        "--stop-at", "normal_above",
     ]
     values.extend(list(extra or []))
     return safe_square_transfer_cli.build_parser().parse_args(values)
@@ -198,6 +199,45 @@ def test_staged_plan_contains_forward_segments():
     assert [item["segment_name"] for item in plan] == ["current_lift", "target_high_above", "target_normal_above"]
 
 
+def test_cli_default_stop_at_is_high_above():
+    args = safe_square_transfer_cli.build_parser().parse_args([
+        "--square", "e4",
+        "--output", "/tmp/safe_transfer_default.json",
+    ])
+    assert args.stop_at == "high_above"
+
+
+def test_stop_at_high_above_plan_stops_before_normal_above():
+    args = _args("/tmp", ["--stop-at", "high_above"])
+    plan = safe_transfer.build_staged_plan(
+        [0.0, 0.0, 0.050],
+        [0.2, 0.1, 0.026],
+        [0.0, 0.0, 0.050],
+        0.026,
+        args,
+    )
+    assert [item["segment_name"] for item in plan] == ["current_lift", "target_high_above"]
+
+
+def test_stop_at_return_home_plan_creates_full_return_sequence():
+    args = _args("/tmp", ["--stop-at", "return_home"])
+    plan = safe_transfer.build_staged_plan(
+        [0.0, 0.0, 0.050],
+        [0.2, 0.1, 0.026],
+        [0.0, 0.0, 0.050],
+        0.026,
+        args,
+    )
+    assert [item["segment_name"] for item in plan] == [
+        "current_lift",
+        "target_high_above",
+        "target_normal_above",
+        "target_high_above_return",
+        "home_high",
+        "home_pose",
+    ]
+
+
 def test_return_home_plan_adds_return_segments():
     args = _args("/tmp", ["--return-home"])
     plan = safe_transfer.build_staged_plan(
@@ -281,6 +321,19 @@ def test_route_segments_are_high_above_only():
     assert [item["route_waypoint"] for item in route_segments] == [True, True]
     assert [item["target_world_xyz_m"][2] for item in route_segments] == [0.166, 0.166]
     assert not [item for item in plan if "route_normal" in item["segment_name"]]
+
+
+def test_return_route_squares_are_ignored_for_high_above_without_return_home():
+    args = _args("/tmp", ["--stop-at", "high_above", "--return-route-squares", "a2,c3", "--route-above-offset-m", "0.140"])
+    plan = safe_transfer.build_staged_plan(
+        [0.0, 0.0, 0.050],
+        [0.2, 0.1, 0.026],
+        [0.0, 0.0, 0.050],
+        0.026,
+        args,
+        return_route_targets=_route_targets(["a2", "c3"], 0.166),
+    )
+    assert [item["segment_name"] for item in plan] == ["current_lift", "target_high_above"]
 
 
 def test_old_settle_time_behavior_remains_for_all_segments(tmpdir, monkeypatch):
@@ -422,6 +475,23 @@ def test_path_validation_is_called_for_every_segment(tmpdir, monkeypatch):
     )
     assert len(log["segments"]) == 3
     assert calls["count"] == 3
+
+
+def test_stop_at_high_above_runs_path_validation_for_two_segments(tmpdir, monkeypatch):
+    calls = {"count": 0}
+
+    def counting_path(*args, **kwargs):
+        calls["count"] += 1
+        return _passing_path(*args, **kwargs)
+
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", counting_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, ["--stop-at", "high_above"]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert [segment["segment_name"] for segment in log["segments"]] == ["current_lift", "target_high_above"]
+    assert calls["count"] == 2
 
 
 def test_route_segments_run_path_validation(tmpdir, monkeypatch):
@@ -824,6 +894,90 @@ def test_output_json_contains_required_segment_fields(tmpdir, monkeypatch):
     assert route_segment["route_square"] == "a2"
     assert route_segment["route_waypoint"] is True
     assert log["segments"][0]["ik_success"] is True
+
+
+def test_output_json_contains_stop_at_and_piece_aware_fields(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    args = _args(tmpdir, [
+        "--stop-at", "high_above",
+        "--enforce-piece-aware-high",
+        "--piece-height-m", "0.054",
+        "--piece-clearance-margin-m", "0.040",
+        "--high-above-offset-m", "0.120",
+    ])
+    log = safe_transfer.run_safe_square_transfer(
+        args,
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    with open(args.output, "r") as handle:
+        saved = json.load(handle)
+    assert saved["stop_at"] == "high_above"
+    assert saved["piece_height_m"] == 0.054
+    assert saved["piece_clearance_margin_m"] == 0.04
+    assert saved["piece_aware_high_required_m"] == 0.094
+    assert saved["piece_aware_high_passed"] is True
+    assert log["abort_reason"] is None
+
+
+def test_piece_aware_high_check_passes_when_offset_is_large_enough(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--stop-at", "high_above",
+            "--enforce-piece-aware-high",
+            "--piece-height-m", "0.054",
+            "--piece-clearance-margin-m", "0.040",
+            "--high-above-offset-m", "0.120",
+        ]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert log["piece_aware_high_required_m"] == 0.094
+    assert log["piece_aware_high_passed"] is True
+    assert log["abort_reason"] is None
+
+
+def test_piece_aware_high_check_aborts_when_offset_is_too_small(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--stop-at", "high_above",
+            "--enforce-piece-aware-high",
+            "--piece-height-m", "0.054",
+            "--piece-clearance-margin-m", "0.040",
+            "--high-above-offset-m", "0.090",
+        ]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert log["piece_aware_high_required_m"] == 0.094
+    assert log["piece_aware_high_passed"] is False
+    assert "requires --high-above-offset-m >= 0.094 m" in log["abort_reason"]
+    assert log["segments"] == []
+
+
+def test_high_above_return_home_skips_normal_above_and_route_waypoints(tmpdir, monkeypatch):
+    monkeypatch.setattr(safe_transfer, "validate_joint_interpolated_tcp_path", _passing_path)
+    log = safe_transfer.run_safe_square_transfer(
+        _args(tmpdir, [
+            "--stop-at", "high_above",
+            "--return-home",
+            "--return-route-squares", "a2,c3,e4",
+            "--route-above-offset-m", "0.140",
+        ]),
+        ik_solver=_home_solver,
+        now_fn=lambda: "2026-05-25T00:00:00Z",
+    )
+    assert [segment["segment_name"] for segment in log["segments"]] == [
+        "current_lift",
+        "target_high_above",
+        "home_high",
+        "home_pose",
+    ]
+    assert "target_normal_above" not in [segment["segment_name"] for segment in log["segments"]]
+    assert not [segment for segment in log["segments"] if segment.get("route_waypoint")]
+    assert log["return_route_squares"] == []
 
 
 def _failed_transfer_approach_report(context, args, joint_positions_rad, square=None, prefer_vertical_approach=None, enforce_approach_angle=None):

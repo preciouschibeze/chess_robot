@@ -77,6 +77,35 @@ class SafeTransferError(RuntimeError):
     pass
 
 
+def resolve_stop_at_mode(args):
+    value = str(getattr(args, "stop_at", "high_above") or "high_above").strip().lower()
+    if value not in ("high_above", "normal_above", "return_home"):
+        raise SafeTransferError("Unsupported --stop-at value: %s" % value)
+    return value
+
+
+def resolve_transfer_behavior(args):
+    stop_at = resolve_stop_at_mode(args)
+    include_normal_above = stop_at in ("normal_above", "return_home")
+    return_home = bool(getattr(args, "return_home", False)) or stop_at == "return_home"
+    use_return_replay = include_normal_above and return_home
+    use_return_route = include_normal_above and return_home
+    return {
+        "stop_at": stop_at,
+        "include_normal_above": include_normal_above,
+        "return_home": return_home,
+        "use_return_replay": use_return_replay,
+        "use_return_route": use_return_route,
+        "return_route_squares": list(getattr(args, "return_route_squares", []) or []) if use_return_route else [],
+    }
+
+
+def piece_aware_high_requirement(args):
+    required = float(args.piece_height_m) + float(args.piece_clearance_margin_m)
+    passed = float(args.high_above_offset_m) >= required
+    return required, passed
+
+
 def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None, sleep_fn=None):
     now_fn = now_fn or utc_timestamp
     sleep_fn = sleep_fn or time.sleep
@@ -90,8 +119,19 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
         raise SafeTransferError("--home-pose is required for safe square transfer.")
     saved_home = saved_home_metadata(context)
     square_world = square_center_world(context["scene_geometry"], args.square)
+    transfer_behavior = resolve_transfer_behavior(args)
+    piece_aware_high_required_m, piece_aware_high_passed = piece_aware_high_requirement(args)
 
-    log = build_transfer_log(args, context, timestamp, mode, board_top)
+    log = build_transfer_log(
+        args,
+        context,
+        timestamp,
+        mode,
+        board_top,
+        transfer_behavior,
+        piece_aware_high_required_m,
+        piece_aware_high_passed,
+    )
     context["square_ik_seed"] = load_square_ik_seed_context(args, context)
     attach_square_ik_seed_log_metadata(log, context["square_ik_seed"])
 
@@ -103,6 +143,12 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
         return finish_transfer_log(args, log)
     if bool(args.execute) and args.confirm != CONFIRM_TEXT:
         set_transfer_abort(log, "Execute mode requires --confirm %s." % CONFIRM_TEXT)
+        return finish_transfer_log(args, log)
+    if bool(getattr(args, "enforce_piece_aware_high", False)) and not piece_aware_high_passed:
+        set_transfer_abort(
+            log,
+            "Piece-aware high approach requires --high-above-offset-m >= %.3f m." % piece_aware_high_required_m,
+        )
         return finish_transfer_log(args, log)
 
     bus = None
@@ -126,7 +172,13 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
             saved_home["saved_home_tcp_world_xyz_m"],
             board_top,
             args,
-            return_route_targets=resolve_return_route_targets(context["scene_geometry"], board_top, args),
+            transfer_behavior=transfer_behavior,
+            return_route_targets=resolve_return_route_targets(
+                context["scene_geometry"],
+                board_top,
+                transfer_behavior,
+                args,
+            ),
         )
 
         completed_segments = {}
@@ -167,7 +219,8 @@ def run_safe_square_transfer(args, bus_factory=None, ik_solver=None, now_fn=None
             bus.close()
 
 
-def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz, board_top_z, args, return_route_targets=None):
+def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz, board_top_z, args, transfer_behavior=None, return_route_targets=None):
+    transfer_behavior = transfer_behavior or resolve_transfer_behavior(args)
     current = np.asarray(current_world_xyz, dtype=float)
     square = np.asarray(square_world_xyz, dtype=float)
     home = np.asarray(saved_home_world_xyz, dtype=float)
@@ -179,16 +232,18 @@ def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz,
     plan = [
         make_world_segment("current_lift", [current[0], current[1], max(float(current[2]), transit_z)]),
         make_world_segment("target_high_above", [square[0], square[1], high_z]),
-        make_world_segment("target_normal_above", [square[0], square[1], normal_z]),
     ]
-    if bool(getattr(args, "return_home", False)):
-        plan.append(
-            make_return_world_segment(
-                "target_high_above_return",
-                [square[0], square[1], high_z],
-                "target_high_above",
+    if transfer_behavior["include_normal_above"]:
+        plan.append(make_world_segment("target_normal_above", [square[0], square[1], normal_z]))
+    if transfer_behavior["return_home"]:
+        if transfer_behavior["use_return_replay"]:
+            plan.append(
+                make_return_world_segment(
+                    "target_high_above_return",
+                    [square[0], square[1], high_z],
+                    "target_high_above",
+                )
             )
-        )
         for route_target in list(return_route_targets or []):
             plan.append(
                 make_route_world_segment(
@@ -196,12 +251,18 @@ def build_staged_plan(current_world_xyz, square_world_xyz, saved_home_world_xyz,
                     route_target["target_world_xyz_m"],
                 )
             )
-        plan.extend([
-            make_return_world_segment(
+        home_high_segment = make_world_segment(
+            "home_high",
+            [home[0], home[1], max(float(home[2]), transit_z)],
+        )
+        if transfer_behavior["use_return_replay"]:
+            home_high_segment = make_return_world_segment(
                 "home_high",
                 [home[0], home[1], max(float(home[2]), transit_z)],
                 "current_lift",
-            ),
+            )
+        plan.extend([
+            home_high_segment,
             {
                 "segment_name": "home_pose",
                 "target_mode": "home_pose",
@@ -569,7 +630,7 @@ def resolve_segment_settle_time(segment_name, args):
     value = getattr(args, "intermediate_settle_time_s", None)
     return base if value is None else float(value)
 
-def build_transfer_log(args, context, timestamp, mode, board_top):
+def build_transfer_log(args, context, timestamp, mode, board_top, transfer_behavior, piece_aware_high_required_m, piece_aware_high_passed):
     locked_ticks = context.get("locked_joint_ticks") or {}
     resolved_policy = getattr(args, "resolved_policy", None)
     if resolved_policy is not None:
@@ -594,9 +655,14 @@ def build_transfer_log(args, context, timestamp, mode, board_top):
         "transit_clearance_m": float(args.transit_clearance_m),
         "normal_above_offset_m": float(args.normal_above_offset_m),
         "high_above_offset_m": float(args.high_above_offset_m),
-        "return_route_squares": list(getattr(args, "return_route_squares", []) or []),
+        "stop_at": transfer_behavior["stop_at"],
+        "piece_height_m": float(args.piece_height_m),
+        "piece_clearance_margin_m": float(args.piece_clearance_margin_m),
+        "piece_aware_high_required_m": float(piece_aware_high_required_m),
+        "piece_aware_high_passed": bool(piece_aware_high_passed),
+        "return_route_squares": list(transfer_behavior["return_route_squares"]),
         "route_above_offset_m": float(args.route_above_offset_m),
-        "return_home": bool(getattr(args, "return_home", False)),
+        "return_home": bool(transfer_behavior["return_home"]),
         "return_strategy": str(getattr(args, "return_strategy", RETURN_STRATEGY_ACHIEVED_REVERSE_REPLAY)),
         "command_sent_any": False,
         "aborted": False,
@@ -696,9 +762,9 @@ def square_center_world(scene_geometry, square):
     raise SafeTransferError("Unknown board square: %s" % square)
 
 
-def resolve_return_route_targets(scene_geometry, board_top_z, args):
+def resolve_return_route_targets(scene_geometry, board_top_z, transfer_behavior, args):
     route_targets = []
-    route_squares = list(getattr(args, "return_route_squares", []) or [])
+    route_squares = list(transfer_behavior.get("return_route_squares") or [])
     route_z = float(board_top_z) + float(args.route_above_offset_m)
     for square_name in route_squares:
         square_world = square_center_world(scene_geometry, square_name)

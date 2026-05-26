@@ -99,6 +99,10 @@ def build_parser():
     parser.add_argument("--normal-above-offset-m", type=float, default=0.080, help="Normal above-square height above board top.")
     parser.add_argument("--high-above-offset-m", type=float, default=0.120, help="High above-square height above board top.")
     parser.add_argument("--route-above-offset-m", type=float, default=None, help="Route waypoint height above board top. Defaults to the high above-square height.")
+    parser.add_argument("--stop-at", choices=("high_above", "normal_above", "return_home"), default="high_above", help="Stop after the high approach, the normal approach, or a full return-home sequence.")
+    parser.add_argument("--piece-height-m", type=float, default=0.054, help="Maximum expected piece height above the board.")
+    parser.add_argument("--piece-clearance-margin-m", type=float, default=0.040, help="Extra safety margin required above the tallest piece for high-above mode.")
+    parser.add_argument("--enforce-piece-aware-high", action="store_true", help="Abort before planning when the configured high-above offset is below piece height plus safety margin.")
     parser.add_argument("--transit-clearance-m", type=float, default=0.120, help="Lift height above board top for XY transit.")
     parser.add_argument("--board-clearance-m", type=float, default=0.060, help="Minimum TCP clearance above board top for XY-changing path samples.")
     parser.add_argument("--path-samples", type=int, default=25, help="Joint-interpolated FK path samples per segment.")
@@ -164,6 +168,9 @@ def print_report(log, output_path):
         print("IK seed notes: %s" % json.dumps(log.get("ik_seed_notes"), sort_keys=False))
     if log.get("resolved_policy") is not None:
         print("Resolved policy: %s" % json.dumps(log["resolved_policy"], sort_keys=True))
+    print("Stop at: %s" % log.get("stop_at"))
+    print("Piece-aware high required m: %s" % format_optional_float(log.get("piece_aware_high_required_m")))
+    print("Piece-aware high passed: %s" % log.get("piece_aware_high_passed"))
     print("Return strategy: %s" % log.get("return_strategy"))
     route_squares = log.get("return_route_squares") or []
     print("Return route squares: %s" % (", ".join(route_squares) if route_squares else "none"))
