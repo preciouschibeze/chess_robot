@@ -12,7 +12,11 @@ import argparse
 import datetime
 import json
 import os
+import select
 import sys
+import termios
+import time
+import tty
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
@@ -65,6 +69,21 @@ KEY_BINDINGS = {
     "6": "gripper",
 }
 
+HOTKEY_JOG_BINDINGS = {
+    "a": ("base_yaw", -1),
+    "d": ("base_yaw", 1),
+    "z": ("shoulder_pitch", -1),
+    "x": ("shoulder_pitch", 1),
+    "c": ("elbow_pitch", -1),
+    "v": ("elbow_pitch", 1),
+    "b": ("wrist_pitch", -1),
+    "n": ("wrist_pitch", 1),
+    "j": ("wrist_roll", -1),
+    "k": ("wrist_roll", 1),
+    "u": ("gripper", -1),
+    "i": ("gripper", 1),
+}
+
 DISPLAY_JOINTS = (
     "base_yaw",
     "shoulder_pitch",
@@ -83,6 +102,23 @@ class CommandRejected(ValueError):
     pass
 
 
+class TeleopSession(object):
+    def __init__(self, mode, session_id=None):
+        self.mode = str(mode)
+        self.session_id = session_id or make_session_id()
+        self.pose_index = 0
+
+    def next_pose_id(self):
+        self.pose_index += 1
+        return self.pose_index
+
+
+def make_session_id():
+    now = datetime.datetime.utcnow()
+    stamp = now.strftime("%Y%m%d_%H%M%S_") + "%03d" % (now.microsecond // 1000)
+    return "teleop_%s" % stamp
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Safe line-command joint teleoperation for hand-eye calibration poses."
@@ -90,6 +126,8 @@ def build_parser():
     parser.add_argument("--execute", action="store_true", help="Allow validated real servo writes.")
     parser.add_argument("--confirm-text", help="Required exact text for --execute: TELEOP")
     parser.add_argument("--dry-run", action="store_true", default=True, help="Dry-run mode is the default.")
+    parser.add_argument("--mode", choices=("line", "hotkey"), default="line")
+    parser.add_argument("--min-command-interval-sec", type=float, default=0.15)
     parser.add_argument("--step-ticks", type=int, default=ARM_DEFAULT_STEP_TICKS)
     parser.add_argument("--wrist-roll-step-ticks", type=int, default=WRIST_ROLL_DEFAULT_STEP_TICKS)
     parser.add_argument("--max-step-ticks", type=int, default=100)
@@ -129,6 +167,12 @@ def validate_args(args):
     args.max_step_ticks = clamp_step_ticks(args.max_step_ticks, args.max_step_ticks)
     args.step_ticks = clamp_step_ticks(args.step_ticks, args.max_step_ticks)
     args.wrist_roll_step_ticks = clamp_step_ticks(args.wrist_roll_step_ticks, args.max_step_ticks)
+    try:
+        args.min_command_interval_sec = float(args.min_command_interval_sec)
+    except (TypeError, ValueError):
+        raise TeleopError("--min-command-interval-sec must be numeric.")
+    if args.min_command_interval_sec < 0.0:
+        raise TeleopError("--min-command-interval-sec must be >= 0.")
     args.dry_run = not bool(args.execute)
     if args.execute and args.confirm_text != CONFIRMATION_TEXT:
         raise TeleopError(
@@ -413,16 +457,22 @@ def compute_transform_payload(args, calibration, current_ticks):
         return joint_angles_rad, None, None, notes
 
 
-def build_pose_snapshot(timestamp, joint_ticks, joint_angles_rad, tcp_frame, notes,
-                        transform=None, tool_frame=None, mode="dry_run"):
+
+def build_pose_snapshot(pose_id, session_id, timestamp_iso, timestamp_unix, joint_ticks,
+                        joint_angles_rad, tcp_frame, notes, transform=None,
+                        tool_frame=None, mode="dry_run", source="keyboard_teleop_line"):
     payload = {
-        "timestamp": timestamp,
+        "pose_id": int(pose_id),
+        "session_id": str(session_id),
+        "timestamp_iso": timestamp_iso,
+        "timestamp": timestamp_iso,
+        "timestamp_unix": float(timestamp_unix),
         "joint_ticks": _ordered_mapping(joint_ticks),
         "joint_angles_rad": _ordered_mapping(joint_angles_rad),
         "tcp_frame": tcp_frame,
         "T_base_gripper": transform,
         "notes": list(notes or []),
-        "source": "keyboard_teleop",
+        "source": source,
         "mode": mode,
     }
     if tool_frame is not None:
@@ -430,12 +480,16 @@ def build_pose_snapshot(timestamp, joint_ticks, joint_angles_rad, tcp_frame, not
     return payload
 
 
-def save_pose_snapshot(args, calibration, current_ticks, extra_notes):
-    timestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+def save_pose_snapshot(args, session, calibration, current_ticks, extra_notes):
+    if session is None:
+        session = TeleopSession(getattr(args, "mode", "line"))
+    pose_id = session.next_pose_id()
+    path, timestamp_iso, timestamp_unix = next_pose_output_path(args.pose_output_dir, pose_id)
     joint_angles_rad, transform, tool_frame, fk_notes = compute_transform_payload(
         args, calibration, current_ticks
     )
-    notes = ["line-command keyboard teleop snapshot"]
+    mode_name = getattr(session, "mode", getattr(args, "mode", "line"))
+    notes = ["%s keyboard teleop snapshot" % mode_name]
     if args.dry_run:
         notes.append("dry-run snapshot from in-session tick state")
     else:
@@ -444,7 +498,10 @@ def save_pose_snapshot(args, calibration, current_ticks, extra_notes):
         notes.append(str(extra_notes))
     notes.extend(fk_notes)
     payload = build_pose_snapshot(
-        timestamp=timestamp,
+        pose_id=pose_id,
+        session_id=session.session_id,
+        timestamp_iso=timestamp_iso,
+        timestamp_unix=timestamp_unix,
         joint_ticks=current_ticks,
         joint_angles_rad=joint_angles_rad,
         tcp_frame=args.tcp_frame,
@@ -452,17 +509,30 @@ def save_pose_snapshot(args, calibration, current_ticks, extra_notes):
         transform=transform,
         tool_frame=tool_frame,
         mode="dry_run" if args.dry_run else "execute",
+        source="keyboard_teleop_%s" % mode_name,
     )
-    if not os.path.isdir(args.pose_output_dir):
-        os.makedirs(args.pose_output_dir)
-    filename = "teleop_pose_{}.json".format(
-        timestamp.replace("-", "").replace(":", "").replace("Z", "Z")
-    )
-    path = os.path.join(args.pose_output_dir, filename)
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     return path, payload
 
+
+def next_pose_output_path(output_dir, pose_id):
+    if not os.path.isdir(output_dir):
+        os.makedirs(output_dir)
+    for _attempt in range(100):
+        now = datetime.datetime.utcnow()
+        timestamp_iso = _format_timestamp_iso(now)
+        stamp = now.strftime("%Y%m%d_%H%M%S_") + "%03d" % (now.microsecond // 1000)
+        filename = "pose_%04d_%s.json" % (int(pose_id), stamp)
+        path = os.path.join(output_dir, filename)
+        if not os.path.exists(path):
+            return path, timestamp_iso, time.time()
+        time.sleep(0.001)
+    raise TeleopError("Could not allocate a unique pose snapshot filename in %s." % output_dir)
+
+
+def _format_timestamp_iso(value):
+    return value.strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (value.microsecond // 1000)
 
 def append_log(path, event_type, **fields):
     directory = os.path.dirname(os.path.abspath(path))
@@ -514,6 +584,82 @@ def disable_torque(bus, records):
     return errors
 
 
+
+def parse_hotkey(key, allow_gripper):
+    if key == "\x03":
+        return {"action": "quit"}
+    if key == "q":
+        return {"action": "quit"}
+    if key == "h":
+        return {"action": "help"}
+    if key == " ":
+        return {"action": "read"}
+    if key == "s":
+        return {"action": "save", "notes": ""}
+    if key == "[":
+        return {"action": "decrease_steps"}
+    if key == "]":
+        return {"action": "increase_steps"}
+    if key in HOTKEY_JOG_BINDINGS:
+        joint, direction = HOTKEY_JOG_BINDINGS[key]
+        if joint == "gripper" and not allow_gripper:
+            return {
+                "action": "ignored",
+                "reason": "gripper hotkeys require --allow-gripper",
+                "key": key,
+            }
+        return {"action": "jog", "joint": joint, "direction": int(direction), "key": key}
+    return {"action": "ignored", "reason": "unmapped key", "key": key}
+
+
+def is_rate_limited(now, last_command_time, min_interval_sec):
+    if last_command_time is None:
+        return False
+    return (float(now) - float(last_command_time)) < float(min_interval_sec)
+
+
+def action_is_rate_limited(action):
+    return action in ("jog", "read", "save", "decrease_steps", "increase_steps")
+
+
+def adjust_all_steps(steps, increase, max_step_ticks):
+    adjusted = {}
+    for joint, step in steps.items():
+        if increase:
+            adjusted[joint] = clamp_step_ticks(int(step) * 2, max_step_ticks)
+        else:
+            adjusted[joint] = clamp_step_ticks(max(1, int(step) // 2), max_step_ticks)
+    steps.update(adjusted)
+    return adjusted
+
+
+def print_hotkey_help(allow_gripper=False):
+    print("")
+    print("Hotkey controls:")
+    print("  a/d = base_yaw -/+")
+    print("  z/x = shoulder_pitch -/+")
+    print("  c/v = elbow_pitch -/+")
+    print("  b/n = wrist_pitch -/+")
+    print("  j/k = wrist_roll -/+")
+    if allow_gripper:
+        print("  u/i = gripper -/+")
+    else:
+        print("  u/i = gripper -/+ only with --allow-gripper")
+    print("  space = readback")
+    print("  s = save pose and continue")
+    print("  [ / ] = decrease/increase all step sizes")
+    print("  h = help")
+    print("  q = quit")
+    print("")
+
+
+def print_step_summary(steps):
+    print("Current step sizes:")
+    for joint in DISPLAY_JOINTS:
+        if joint in steps:
+            print("  {:<16} {} ticks".format(joint, steps[joint]))
+    print("")
+
 def print_help():
     print("")
     print("Commands:")
@@ -553,7 +699,20 @@ def print_joint_table(records, ticks, calibration, active_joint, steps):
     print("")
 
 
-def print_jog_result(validation):
+
+def print_jog_result(validation, compact=False):
+    if compact:
+        status = "accepted" if validation.get("ok") else "rejected"
+        message = "Jog {joint} delta={delta} target={target} {status}".format(
+            joint=validation.get("user_joint") or validation.get("joint"),
+            delta=validation.get("delta"),
+            target=validation.get("target_position"),
+            status=status,
+        )
+        if not validation.get("ok"):
+            message += " reason={}".format(validation.get("reason"))
+        print(message)
+        return
     print("Jog proposal:")
     print("  joint: {}".format(validation.get("user_joint") or validation.get("joint")))
     print("  current tick: {}".format(validation.get("current_position")))
@@ -564,9 +723,9 @@ def print_jog_result(validation):
         print("  reason: {}".format(validation.get("reason")))
 
 
-def execute_jog(args, bus, records, current_ticks, active_joint, delta, step):
+def execute_jog(args, bus, records, current_ticks, active_joint, delta, step, compact=False):
     validation = validate_jog_request(records, current_ticks, active_joint, delta, step)
-    print_jog_result(validation)
+    print_jog_result(validation, compact=compact)
     append_log(
         args.log_path,
         "jog",
@@ -583,7 +742,10 @@ def execute_jog(args, bus, records, current_ticks, active_joint, delta, step):
 
     if args.dry_run:
         current_ticks[active_joint] = target_position
-        print("  dry-run: no servo write performed")
+        if compact:
+            print("  readback tick: dry-run")
+        else:
+            print("  dry-run: no servo write performed")
         return True
 
     record = records[active_joint]
@@ -605,12 +767,13 @@ def execute_jog(args, bus, records, current_ticks, active_joint, delta, step):
         if readback is not None:
             current_ticks[active_joint] = int(readback)
             print("  readback tick: {}".format(readback))
+        else:
+            print("  readback tick: unavailable")
     except Exception as exc:
         print("  readback warning: {}".format(exc))
     return True
 
-
-def interactive_loop(args, bus, records, calibration, current_ticks):
+def interactive_loop(args, session, bus, records, calibration, current_ticks):
     active_joint = DEFAULT_ACTIVE_JOINT
     steps = default_steps(args)
     allowed = allowed_joints(args.allow_gripper)
@@ -648,6 +811,7 @@ def interactive_loop(args, bus, records, calibration, current_ticks):
             print_help()
             continue
         if action == "quit":
+            append_log(args.log_path, "quit", mode=session.mode, reason="operator_key")
             return "quit"
         if action == "select":
             active_joint = command["joint"]
@@ -664,9 +828,9 @@ def interactive_loop(args, bus, records, calibration, current_ticks):
             print_joint_table(records, current_ticks, calibration, active_joint, steps)
             continue
         if action == "save":
-            path, _payload = save_pose_snapshot(args, calibration, current_ticks, command.get("notes"))
+            path, payload = save_pose_snapshot(args, session, calibration, current_ticks, command.get("notes"))
             print("Saved pose snapshot: {}".format(path))
-            append_log(args.log_path, "save_pose", path=path, dry_run=bool(args.dry_run))
+            append_log(args.log_path, "save_pose", pose_path=path, pose_id=payload.get("pose_id"), session_id=session.session_id, source=payload.get("source"), dry_run=bool(args.dry_run))
             continue
         if action == "jog":
             jog_joint = command["joint"]
@@ -682,6 +846,93 @@ def interactive_loop(args, bus, records, calibration, current_ticks):
             print_joint_table(records, current_ticks, calibration, active_joint, steps)
             continue
 
+
+
+def hotkey_loop(args, session, bus, records, calibration, current_ticks):
+    steps = default_steps(args)
+    last_command_time = None
+
+    print_hotkey_help(args.allow_gripper)
+    print_step_summary(steps)
+    print_joint_table(records, current_ticks, calibration, DEFAULT_ACTIVE_JOINT, steps)
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)
+        try:
+            while True:
+                ready, _unused_write, _unused_error = select.select([sys.stdin], [], [], 0.1)
+                if not ready:
+                    continue
+
+                key = sys.stdin.read(1)
+                command = parse_hotkey(key, args.allow_gripper)
+                action = command.get("action")
+
+                if action == "ignored":
+                    append_log(args.log_path, "ignored_key", key=repr(key), reason=command.get("reason"), mode=session.mode)
+                    if command.get("reason") != "unmapped key":
+                        print("Ignored key: {}".format(command.get("reason")))
+                    continue
+
+                now = time.time()
+                if action_is_rate_limited(action) and is_rate_limited(now, last_command_time, args.min_command_interval_sec):
+                    append_log(
+                        args.log_path,
+                        "ignored_rate_limited_key",
+                        key=repr(key),
+                        action=action,
+                        min_command_interval_sec=args.min_command_interval_sec,
+                        mode=session.mode,
+                    )
+                    print("Ignored key: rate limited")
+                    continue
+                if action_is_rate_limited(action):
+                    last_command_time = now
+
+                if action == "quit":
+                    append_log(args.log_path, "quit", mode=session.mode, reason="operator_key")
+                    return "quit"
+                if action == "help":
+                    print_hotkey_help(args.allow_gripper)
+                    print_step_summary(steps)
+                    continue
+                if action == "read":
+                    current_ticks.clear()
+                    current_ticks.update(read_current_ticks(bus, records))
+                    print("Readback complete.")
+                    print_joint_table(records, current_ticks, calibration, DEFAULT_ACTIVE_JOINT, steps)
+                    continue
+                if action == "save":
+                    path, payload = save_pose_snapshot(args, session, calibration, current_ticks, command.get("notes"))
+                    print("Saved pose {:04d}: {}".format(int(payload.get("pose_id")), path))
+                    append_log(args.log_path, "save_pose", pose_path=path, pose_id=payload.get("pose_id"), session_id=session.session_id, source=payload.get("source"), dry_run=bool(args.dry_run))
+                    continue
+                if action in ("decrease_steps", "increase_steps"):
+                    adjust_all_steps(steps, increase=(action == "increase_steps"), max_step_ticks=args.max_step_ticks)
+                    print_step_summary(steps)
+                    continue
+                if action == "jog":
+                    joint = command["joint"]
+                    step = int(steps[joint])
+                    delta = int(command["direction"]) * step
+                    execute_jog(
+                        args=args,
+                        bus=bus,
+                        records=records,
+                        current_ticks=current_ticks,
+                        active_joint=joint,
+                        delta=delta,
+                        step=step,
+                        compact=True,
+                    )
+                    continue
+        except KeyboardInterrupt:
+            append_log(args.log_path, "quit", mode=session.mode, reason="keyboard_interrupt")
+            return "interrupt"
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 def _ordered_mapping(mapping):
     ordered = {}
@@ -701,7 +952,7 @@ def _matrix_to_list(matrix):
 def main(argv=None, bus_factory=None):
     args = validate_args(build_parser().parse_args(argv))
     mode_text = "EXECUTE" if args.execute else "DRY-RUN"
-    print("Keyboard teleop mode: {}".format(mode_text))
+    print("Keyboard teleop mode: {} ({})".format(mode_text, args.mode))
     if args.dry_run:
         print("WARNING: dry-run mode is active. Jog commands validate and update the in-session state only.")
     else:
@@ -714,6 +965,7 @@ def main(argv=None, bus_factory=None):
     if DEFAULT_ACTIVE_JOINT not in records or not records[DEFAULT_ACTIVE_JOINT].get("joggable"):
         raise TeleopError("Default active joint base_yaw is not joggable.")
 
+    session = TeleopSession(args.mode)
     bus = None
     torque_enabled = False
     exit_reason = None
@@ -730,7 +982,10 @@ def main(argv=None, bus_factory=None):
             torque_enabled = True
             print("Torque enabled for joggable joints.")
 
-        exit_reason = interactive_loop(args, bus, records, calibration, current_ticks)
+        if args.mode == "hotkey":
+            exit_reason = hotkey_loop(args, session, bus, records, calibration, current_ticks)
+        else:
+            exit_reason = interactive_loop(args, session, bus, records, calibration, current_ticks)
         return 0
     finally:
         if bus is not None:

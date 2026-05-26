@@ -1,0 +1,73 @@
+{
+  "T_base_gripper": [
+    [
+      0.49941149942606783,
+      0.7365970822344534,
+      0.4560843043612623,
+      0.20505104964778553
+    ],
+    [
+      0.8635720198522947,
+      -0.46547496606676403,
+      -0.19384638890980926,
+      -0.062307424741745714
+    ],
+    [
+      0.06950914162349162,
+      0.49067075968396057,
+      -0.8685681808712141,
+      0.08291099103279836
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "joint_angles_rad": {
+    "base_yaw": 0.401902966426038,
+    "elbow_pitch": 0.8298836062461319,
+    "shoulder_pitch": -0.863631183579616,
+    "wrist_pitch": 1.086058397823034,
+    "wrist_roll": -1.6628351740680352
+  },
+  "joint_ticks": {
+    "base_yaw": 2337,
+    "elbow_pitch": 2537,
+    "shoulder_pitch": 1528,
+    "wrist_pitch": 2711,
+    "wrist_roll": 1032
+  },
+  "mode": "execute",
+  "notes": [
+    "hotkey keyboard teleop snapshot",
+    "execute-mode snapshot from latest readback/session state"
+  ],
+  "pose_id": 1,
+  "session_id": "teleop_20260526_123005_615",
+  "source": "keyboard_teleop_hotkey",
+  "tcp_frame": "gripper_frame",
+  "timestamp": "2026-05-26T12:36:37.869Z",
+  "timestamp_iso": "2026-05-26T12:36:37.869Z",
+  "timestamp_unix": 1779798997.869258,
+  "tool_frame": {
+    "approach_axis_local": [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    "approach_axis_local_defaulted": false,
+    "tcp_frame": "gripper_frame",
+    "tool_offset_rpy_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "tool_offset_xyz_m": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

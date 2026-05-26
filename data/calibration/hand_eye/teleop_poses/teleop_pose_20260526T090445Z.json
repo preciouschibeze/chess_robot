@@ -1,0 +1,69 @@
+{
+  "T_base_gripper": [
+    [
+      0.14788095958174816,
+      0.78921920044864,
+      0.5960404981512498,
+      0.17531987758805553
+    ],
+    [
+      0.9884897677027827,
+      -0.13740045709168083,
+      -0.06331740312027594,
+      -0.00673308555006543
+    ],
+    [
+      0.03192492662606648,
+      0.598543371890631,
+      -0.8004540155597412,
+      0.02668505992472199
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "joint_angles_rad": {
+    "base_yaw": 0.10584467436410924,
+    "elbow_pitch": 1.581534192310096,
+    "shoulder_pitch": -1.9128740424933945,
+    "wrist_pitch": 1.2593982268541115,
+    "wrist_roll": -1.5753982691585535
+  },
+  "joint_ticks": {
+    "base_yaw": 2144,
+    "elbow_pitch": 3027,
+    "shoulder_pitch": 844,
+    "wrist_pitch": 2824,
+    "wrist_roll": 1089
+  },
+  "mode": "dry_run",
+  "notes": [
+    "line-command keyboard teleop snapshot",
+    "dry-run snapshot from in-session tick state"
+  ],
+  "source": "keyboard_teleop",
+  "tcp_frame": "gripper_frame",
+  "timestamp": "2026-05-26T09:04:45Z",
+  "tool_frame": {
+    "approach_axis_local": [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    "approach_axis_local_defaulted": false,
+    "tcp_frame": "gripper_frame",
+    "tool_offset_rpy_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "tool_offset_xyz_m": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}
