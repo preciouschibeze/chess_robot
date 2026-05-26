@@ -7,13 +7,13 @@ joints:
     position: 1074
   shoulder_lift:
     id: 2
-    position: 1776
+    position: 1990
   elbow_flex:
     id: 3
-    position: 2321
+    position: 1857
   wrist_flex:
     id: 4
-    position: 2619
+    position: 2706
   wrist_roll:
     id: 5
     position: 1091
