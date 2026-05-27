@@ -1,5 +1,7 @@
 """Small wrapper around python-chess board state."""
 
+from __future__ import absolute_import
+
 import os
 
 import chess
@@ -23,6 +25,9 @@ class ChessBoardState(object):
 
     def fen(self):
         return self._board.fen()
+
+    def ascii(self):
+        return str(self._board)
 
     def legal_moves(self):
         return list(self._board.legal_moves)
@@ -60,12 +65,46 @@ class ChessBoardState(object):
             f.write("\n")
         return path
 
-    def push_uci(self, uci):
-        move = chess.Move.from_uci(uci)
+    def parse_uci(self, uci):
+        try:
+            return chess.Move.from_uci(str(uci).strip().lower())
+        except Exception:
+            raise ValueError("Invalid UCI move format: {}".format(uci))
+
+    def is_legal_uci(self, uci):
+        move = self.parse_uci(uci)
+        return move in self._board.legal_moves
+
+    def classify_uci(self, uci):
+        move = self.parse_uci(uci)
+        if move not in self._board.legal_moves:
+            return "illegal"
+        if self._board.is_castling(move):
+            return "castle"
+        if self._board.is_en_passant(move):
+            return "en_passant"
+        if move.promotion is not None:
+            return "promotion"
+        if self._board.is_capture(move):
+            return "capture"
+        return "quiet"
+
+    def validate_uci(self, uci):
+        move = self.parse_uci(uci)
         if move not in self._board.legal_moves:
             raise ValueError("Illegal move for current board: {}".format(uci))
+        return move
+
+    def push_uci(self, uci):
+        move = self.validate_uci(uci)
         self._board.push(move)
         return move
+
+    def apply_human_move(self, uci):
+        return self.push_uci(uci)
+
+    def apply_robot_move(self, uci):
+        return self.push_uci(uci)
 
     def san(self, move):
         return self._board.san(move)

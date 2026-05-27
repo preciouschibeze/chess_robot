@@ -1,0 +1,10 @@
+# Constrained demo movebook for perception-to-action validation.
+# Keys are confirmed human moves (UCI), values are robot responses (UCI).
+# Keep robot responses limited to fully calibrated source/destination squares.
+# Avoid captures and special moves in this file for safe demo operation.
+
+demo_movebook:
+  e2e4: e7e5
+  g1f3: b8c6
+  f1c4: g8f6
+  d2d3: f8c5
