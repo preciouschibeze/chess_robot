@@ -1,0 +1,1536 @@
+{
+  "evidence_files_scanned": [
+    "README.md",
+    "chess_robot/robot/__init__.py",
+    "chess_robot/robot/approach_orientation.py",
+    "chess_robot/robot/approach_policy.py",
+    "chess_robot/robot/arm_controller.py",
+    "chess_robot/robot/fk.py",
+    "chess_robot/robot/gripper.py",
+    "chess_robot/robot/ik.py",
+    "chess_robot/robot/ik_seed_poses.py",
+    "chess_robot/robot/ik_validation.py",
+    "chess_robot/robot/jacobian.py",
+    "chess_robot/robot/joint_calibration.py",
+    "chess_robot/robot/joint_limits.py",
+    "chess_robot/robot/motion_primitives.py",
+    "chess_robot/robot/motion_safety.py",
+    "chess_robot/robot/reachability.py",
+    "chess_robot/robot/safe_recovery.py",
+    "chess_robot/robot/safe_transfer.py",
+    "chess_robot/robot/safety.py",
+    "chess_robot/robot/servo_bus.py",
+    "chess_robot/robot/tool_frames.py",
+    "chess_robot/robot/urdf_model.py",
+    "chess_robot/robot/workspace.py",
+    "data/calibration/board/board_profile.yaml",
+    "data/calibration/cameras/README.md",
+    "data/calibration/cameras/overhead_calibration.json",
+    "data/calibration/cameras/overhead_calibration.npz",
+    "data/calibration/cameras/wrist_calibration.json",
+    "data/calibration/cameras/wrist_calibration.npz",
+    "data/calibration/gripper/gripper_profile.yaml",
+    "data/calibration/gripper/tool_frames.yaml",
+    "data/calibration/hand_eye/teleop_poses/pose_0001_20260526_094230_778.json",
+    "data/calibration/hand_eye/teleop_poses/pose_0001_20260526_094257_768.json",
+    "data/calibration/hand_eye/teleop_poses/pose_0001_20260526_094723_624.json",
+    "data/calibration/hand_eye/teleop_poses/pose_0001_20260526_123637_869.json",
+    "data/calibration/hand_eye/teleop_poses/pose_0002_20260526_094725_696.json",
+    "data/calibration/hand_eye/teleop_poses/pose_0003_20260526_094727_267.json",
+    "data/calibration/hand_eye/teleop_poses/teleop_pose_20260526T090445Z.json",
+    "data/calibration/robot/approach_policy.yaml",
+    "data/calibration/robot/home_pose.yaml",
+    "data/calibration/robot/ik_seed_poses.yaml",
+    "data/calibration/robot/joint_calibration.before_midpoint_zero.yaml",
+    "data/calibration/robot/joint_calibration.yaml",
+    "data/calibration/robot/joint_directions.yaml",
+    "data/calibration/robot/joint_limits.yaml",
+    "data/calibration/robot/joint_preferences.yaml",
+    "data/calibration/robot/joint_safety_limits.yaml",
+    "data/calibration/robot/scene_geometry.yaml",
+    "data/calibration/robot/servo_map.yaml",
+    "data/calibration/robot/servo_snapshot.yaml",
+    "data/calibration/robot/square_targets.before_original_movebook_20260527_142121.yaml",
+    "data/calibration/robot/square_targets.yaml",
+    "data/debug/baseline_raw.png",
+    "data/debug/baseline_undistorted.png",
+    "data/debug/board_grid_overlay.png",
+    "data/debug/board_labels_overlay.png",
+    "data/debug/changed_square_acceptance/20260518_191453/00_empty/latest_raw.png",
+    "data/debug/changed_square_acceptance/20260518_191453/00_empty/latest_undistorted.png",
+    "data/debug/changed_square_acceptance/20260518_191453/00_empty/occupancy_crop_overlay.png",
+    "data/debug/changed_square_acceptance/20260518_191453/00_empty/occupancy_diagnostics.json",
+    "data/debug/changed_square_acceptance/20260518_191453/00_empty/occupancy_grid.png",
+    "data/debug/changed_square_acceptance/20260518_191453/00_empty/occupancy_snapshot.json",
+    "data/debug/changed_square_acceptance/20260518_191453/00_empty/square_crops_contact_sheet.png",
+    "data/debug/changed_square_acceptance/20260518_191453/01_add_e4/latest_raw.png",
+    "data/debug/changed_square_acceptance/20260518_191453/01_add_e4/latest_undistorted.png",
+    "data/debug/changed_square_acceptance/20260518_191453/01_add_e4/occupancy_crop_overlay.png",
+    "data/debug/changed_square_acceptance/20260518_191453/01_add_e4/occupancy_diagnostics.json",
+    "data/debug/changed_square_acceptance/20260518_191453/01_add_e4/occupancy_grid.png",
+    "data/debug/changed_square_acceptance/20260518_191453/01_add_e4/occupancy_snapshot.json",
+    "data/debug/changed_square_acceptance/20260518_191453/01_add_e4/square_crops_contact_sheet.png",
+    "data/debug/changed_square_acceptance/20260518_191453/02_remove_e4/latest_raw.png",
+    "data/debug/changed_square_acceptance/20260518_191453/02_remove_e4/latest_undistorted.png",
+    "data/debug/changed_square_acceptance/20260518_191453/02_remove_e4/occupancy_crop_overlay.png",
+    "data/debug/changed_square_acceptance/20260518_191453/02_remove_e4/occupancy_diagnostics.json",
+    "data/debug/changed_square_acceptance/20260518_191453/02_remove_e4/occupancy_grid.png",
+    "data/debug/changed_square_acceptance/20260518_191453/02_remove_e4/occupancy_snapshot.json",
+    "data/debug/changed_square_acceptance/20260518_191453/02_remove_e4/square_crops_contact_sheet.png",
+    "data/debug/changed_square_acceptance/20260518_191453/03_piece_on_e2/latest_raw.png",
+    "data/debug/changed_square_acceptance/20260518_191453/03_piece_on_e2/latest_undistorted.png",
+    "data/debug/changed_square_acceptance/20260518_191453/03_piece_on_e2/occupancy_crop_overlay.png",
+    "data/debug/changed_square_acceptance/20260518_191453/03_piece_on_e2/occupancy_diagnostics.json",
+    "data/debug/changed_square_acceptance/20260518_191453/03_piece_on_e2/occupancy_grid.png",
+    "data/debug/changed_square_acceptance/20260518_191453/03_piece_on_e2/occupancy_snapshot.json",
+    "data/debug/changed_square_acceptance/20260518_191453/03_piece_on_e2/square_crops_contact_sheet.png",
+    "data/debug/changed_square_acceptance/20260518_191453/04_piece_moved_e2_to_e4/latest_raw.png",
+    "data/debug/changed_square_acceptance/20260518_191453/04_piece_moved_e2_to_e4/latest_undistorted.png",
+    "data/debug/changed_square_acceptance/20260518_191453/04_piece_moved_e2_to_e4/occupancy_crop_overlay.png",
+    "data/debug/changed_square_acceptance/20260518_191453/04_piece_moved_e2_to_e4/occupancy_diagnostics.json",
+    "data/debug/changed_square_acceptance/20260518_191453/04_piece_moved_e2_to_e4/occupancy_grid.png",
+    "data/debug/changed_square_acceptance/20260518_191453/04_piece_moved_e2_to_e4/occupancy_snapshot.json",
+    "data/debug/changed_square_acceptance/20260518_191453/04_piece_moved_e2_to_e4/square_crops_contact_sheet.png",
+    "data/debug/changed_square_acceptance/20260518_191453/ACCEPTANCE_SUMMARY.md",
+    "data/debug/changed_square_acceptance/20260518_191453/acceptance_summary.json",
+    "data/debug/changed_square_acceptance/20260518_191453/transition_00_empty_to_01_add_e4/transition_grid.png",
+    "data/debug/changed_square_acceptance/20260518_191453/transition_00_empty_to_01_add_e4/transition_result.json",
+    "data/debug/changed_square_acceptance/20260518_191453/transition_01_add_e4_to_02_remove_e4/transition_grid.png",
+    "data/debug/changed_square_acceptance/20260518_191453/transition_01_add_e4_to_02_remove_e4/transition_result.json",
+    "data/debug/changed_square_acceptance/20260518_191453/transition_03_e2_to_04_e4/transition_grid.png",
+    "data/debug/changed_square_acceptance/20260518_191453/transition_03_e2_to_04_e4/transition_result.json",
+    "data/debug/current_overhead_check/board_grid_overlay.png",
+    "data/debug/current_overhead_check/board_labels_overlay.png",
+    "data/debug/current_overhead_check/occupancy_crop_overlay.png",
+    "data/debug/explain_square_b8.json",
+    "data/debug/explain_square_b8.md",
+    "data/debug/explain_square_c8.json",
+    "data/debug/explain_square_c8.md",
+    "data/debug/ik_target_test.json",
+    "data/debug/jog_and_save_c3_pick_pose_dry_run.json",
+    "data/debug/jog_and_save_c3_pick_pose_real.json",
+    "data/debug/jog_and_save_c3_place_pose_dry_run.json",
+    "data/debug/jog_and_save_square_pose.json",
+    "data/debug/latest_move_match_result.json",
+    "data/debug/latest_move_plan.json",
+    "data/debug/latest_occupancy_snapshot.json",
+    "data/debug/latest_resolved_move_plan.json",
+    "data/debug/latest_robot_move_applied_result.json",
+    "data/debug/latest_robot_move_result.json",
+    "data/debug/latest_transition_grid.png",
+    "data/debug/latest_transition_result.json",
+    "data/debug/movebook_physical_sequence_last.json",
+    "data/debug/occupancy_crop_overlay.png",
+    "data/debug/occupancy_diagnostics.json",
+    "data/debug/occupancy_grid.png",
+    "data/debug/open_loop_pick_place_c3_c3_dry_run.json",
+    "data/debug/open_loop_pick_place_c3_c3_real.json",
+    "data/debug/open_loop_pick_place_e7_e5_home_dry_run.json",
+    "data/debug/recover_home_a1_high_execute.json",
+    "data/debug/recover_home_dryrun.json",
+    "data/debug/recover_home_e4_high_execute.json",
+    "data/debug/safe_transfer_a1_dryrun.json",
+    "data/debug/safe_transfer_a1_high_above_only_dryrun.json",
+    "data/debug/safe_transfer_a1_high_above_only_execute.json",
+    "data/debug/safe_transfer_a1_high_above_recovery_test_execute.json",
+    "data/debug/safe_transfer_a1_policy_dryrun.json",
+    "data/debug/safe_transfer_a1_policy_execute.json",
+    "data/debug/safe_transfer_a1_return_home_timing_execute.json",
+    "data/debug/safe_transfer_a1_route_return_dryrun.json",
+    "data/debug/safe_transfer_a1_route_return_execute.json",
+    "data/debug/safe_transfer_a1_seeded_achieved_reverse_replay_dryrun.json",
+    "data/debug/safe_transfer_a1_seeded_achieved_reverse_replay_execute.json",
+    "data/debug/safe_transfer_a1_seeded_dryrun.json",
+    "data/debug/safe_transfer_a1_seeded_execute.json",
+    "data/debug/safe_transfer_a1_seeded_reverse_replay_dryrun.json",
+    "data/debug/safe_transfer_a1_seeded_reverse_replay_execute.json",
+    "data/debug/safe_transfer_a1_vertical_approach.json",
+    "data/debug/safe_transfer_a1_vertical_approach_weight002_dryrun.json",
+    "data/debug/safe_transfer_a2_vertical_approach.json",
+    "data/debug/safe_transfer_a8_vertical_approach.json",
+    "data/debug/safe_transfer_b1_policy_dryrun.json",
+    "data/debug/safe_transfer_b1_vertical_approach.json",
+    "data/debug/safe_transfer_b1_vertical_approach_weight002_dryrun.json",
+    "data/debug/safe_transfer_c1_vertical_approach.json",
+    "data/debug/safe_transfer_e3_route_return_execute.json",
+    "data/debug/safe_transfer_e4_dryrun.json",
+    "data/debug/safe_transfer_e4_high_above_only_execute.json",
+    "data/debug/safe_transfer_e4_high_above_recovery_test_execute.json",
+    "data/debug/safe_transfer_e4_policy_dryrun.json",
+    "data/debug/safe_transfer_e4_policy_execute.json",
+    "data/debug/safe_transfer_e4_return_home_dryrun.json",
+    "data/debug/safe_transfer_e4_return_home_execute.json",
+    "data/debug/safe_transfer_e4_return_home_execute_settle05.json",
+    "data/debug/safe_transfer_e4_return_home_timing_dryrun.json",
+    "data/debug/safe_transfer_e4_return_home_timing_execute.json",
+    "data/debug/safe_transfer_e4_vertical_approach_dryrun.json",
+    "data/debug/safe_transfer_e4_vertical_approach_execute.json",
+    "data/debug/safe_transfer_f1_vertical_approach.json",
+    "data/debug/safe_transfer_g1_vertical_approach.json",
+    "data/debug/safe_transfer_h1_policy_dryrun.json",
+    "data/debug/safe_transfer_h1_vertical_approach.json",
+    "data/debug/safe_transfer_h1_vertical_approach_weight002_dryrun.json",
+    "data/debug/safe_transfer_h2_vertical_approach.json",
+    "data/debug/safe_transfer_h3_dryrun.json",
+    "data/debug/safe_transfer_h3_vertical_approach.json",
+    "data/debug/safe_transfer_h8_vertical_approach.json",
+    "data/debug/single_ik_pose_a1_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_a2_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_a3_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_a4_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_a5_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_a6_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_a7_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_a8_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_b4_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_c3_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_c4_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_c5_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_capture_above_dryrun.json",
+    "data/debug/single_ik_pose_d1_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_d4_above_execute.json",
+    "data/debug/single_ik_pose_d4_above_wristroll_locked_dryrun.json",
+    "data/debug/single_ik_pose_d4_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_e1_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_e2_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_e3_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_e4_above_dryrun.json",
+    "data/debug/single_ik_pose_e4_above_execute.json",
+    "data/debug/single_ik_pose_e4_above_safety_dryrun.json",
+    "data/debug/single_ik_pose_e4_above_safety_execute.json",
+    "data/debug/single_ik_pose_e4_above_wristroll_locked_dryrun.json",
+    "data/debug/single_ik_pose_e4_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_e4_high_above_safety_execute.json",
+    "data/debug/single_ik_pose_e4_normal_above_from_high_safety_execute.json",
+    "data/debug/single_ik_pose_e5_above_execute.json",
+    "data/debug/single_ik_pose_e6_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_e8_above_dryrun.json",
+    "data/debug/single_ik_pose_e8_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_f4_above_wristroll_locked_dryrun.json",
+    "data/debug/single_ik_pose_f4_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_f8_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_g3_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_g4_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_g8_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_h1_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_h3_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_h4_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_h5_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_h6_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_h7_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_h8_above_wristroll_locked_execute.json",
+    "data/debug/single_ik_pose_home_adjusted_dryrun.json",
+    "data/debug/single_ik_pose_home_adjusted_execute.json",
+    "data/debug/single_ik_pose_home_dryrun.json",
+    "data/debug/single_ik_pose_home_execute.json",
+    "data/debug/single_ik_pose_home_return_after_a1_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_a3_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_a4_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_a8_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_c3_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_d1_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_d4_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_e1_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_e2_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_e4_execute.json",
+    "data/debug/single_ik_pose_home_return_after_e4_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_e5_execute.json",
+    "data/debug/single_ik_pose_home_return_after_e6_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_e8_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_f4_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_f8_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_g3_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_g8_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_h1_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_h3_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_h4_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_h8_locked_execute.json",
+    "data/debug/single_ik_pose_home_return_after_settle3.json",
+    "data/debug/single_ik_pose_home_return_execute.json",
+    "data/debug/single_ik_pose_home_safety_dryrun.json",
+    "data/debug/single_ik_pose_home_zplus10_dryrun.json",
+    "data/debug/single_ik_pose_home_zplus10_execute.json",
+    "data/debug/single_ik_pose_home_zplus10_execute_settle3.json",
+    "data/debug/single_ik_pose_home_zplus40_safety_execute.json",
+    "data/debug/single_ik_pose_new_home_pose.json",
+    "data/debug/so101_fk_home.png",
+    "data/debug/so101_fk_saved_home.png",
+    "data/debug/so101_fk_saved_home_manual_urdf_zero.png",
+    "data/debug/so101_fk_saved_home_midpoint_zero.png",
+    "data/debug/so101_fk_test.png",
+    "data/debug/so101_joint_limit_audit.csv",
+    "data/debug/so101_joint_limit_audit.json",
+    "data/debug/so101_joint_limit_audit_summary.txt",
+    "data/debug/so101_scene_workspace_3d.png",
+    "data/debug/so101_scene_workspace_home_rad_3d.png",
+    "data/debug/so101_scene_workspace_home_rad_xy.png",
+    "data/debug/so101_scene_workspace_home_rad_xz.png",
+    "data/debug/so101_scene_workspace_saved_home_3d.png",
+    "data/debug/so101_scene_workspace_saved_home_xy.png",
+    "data/debug/so101_scene_workspace_saved_home_xz.png",
+    "data/debug/so101_scene_workspace_test_3d.png",
+    "data/debug/so101_scene_workspace_test_xy.png",
+    "data/debug/so101_scene_workspace_test_xz.png",
+    "data/debug/so101_scene_workspace_xy.png",
+    "data/debug/so101_scene_workspace_xz.png",
+    "data/debug/so101_square_ik.csv",
+    "data/debug/so101_square_ik.json",
+    "data/debug/so101_square_ik_error_heatmap.png",
+    "data/debug/so101_square_ik_held_piece_center_zero.csv",
+    "data/debug/so101_square_ik_held_piece_center_zero.json",
+    "data/debug/so101_square_ik_held_piece_center_zero_error_heatmap.png",
+    "data/debug/so101_square_ik_held_piece_center_zero_xy.png",
+    "data/debug/so101_square_ik_manual_urdf_zero.csv",
+    "data/debug/so101_square_ik_manual_urdf_zero.json",
+    "data/debug/so101_square_ik_manual_urdf_zero_error_heatmap.png",
+    "data/debug/so101_square_ik_manual_urdf_zero_xy.png",
+    "data/debug/so101_square_ik_midpoint_zero.csv",
+    "data/debug/so101_square_ik_midpoint_zero.json",
+    "data/debug/so101_square_ik_midpoint_zero_error_heatmap.png",
+    "data/debug/so101_square_ik_midpoint_zero_xy.png",
+    "data/debug/so101_square_ik_safety_recalibrated_fast.csv",
+    "data/debug/so101_square_ik_safety_recalibrated_fast.json",
+    "data/debug/so101_square_ik_safety_recalibrated_fast_error_heatmap.png",
+    "data/debug/so101_square_ik_safety_recalibrated_fast_xy.png",
+    "data/debug/so101_square_ik_software_limits.csv",
+    "data/debug/so101_square_ik_software_limits.json",
+    "data/debug/so101_square_ik_software_limits_error_heatmap.png",
+    "data/debug/so101_square_ik_software_limits_xy.png",
+    "data/debug/so101_square_ik_urdf_limits.csv",
+    "data/debug/so101_square_ik_urdf_limits.json",
+    "data/debug/so101_square_ik_urdf_limits_error_heatmap.png",
+    "data/debug/so101_square_ik_urdf_limits_xy.png",
+    "data/debug/so101_square_ik_xy.png",
+    "data/debug/so101_square_reachability.csv",
+    "data/debug/so101_square_reachability.json",
+    "data/debug/so101_square_reachability_smoke.csv",
+    "data/debug/so101_square_reachability_smoke.json",
+    "data/debug/so101_square_reachability_smoke_xy.png",
+    "data/debug/so101_square_reachability_smoke_xz.png",
+    "data/debug/so101_square_reachability_xy.png",
+    "data/debug/so101_square_reachability_xz.png",
+    "data/debug/square_above_motion_all_squares_first_rank_dry_run.json",
+    "data/debug/square_above_motion_c3_real.json",
+    "data/debug/square_above_motion_c4_real.json",
+    "data/debug/square_above_motion_corner_loop_dry_run.json",
+    "data/debug/square_above_motion_corner_loop_real.json",
+    "data/debug/square_above_motion_manual_anchors_dry_run.json",
+    "data/debug/square_crops_contact_sheet.png",
+    "data/debug/square_target_audit.csv",
+    "data/debug/square_target_audit.json",
+    "data/debug/square_target_audit.md",
+    "data/debug/square_target_audit_fixed_only.json",
+    "data/debug/test_four_piece_after_threshold_default_update/occupancy_crop_overlay.png",
+    "data/debug/test_four_piece_after_threshold_default_update/occupancy_diagnostics.json",
+    "data/debug/test_four_piece_after_threshold_default_update/occupancy_grid.png",
+    "data/debug/test_four_piece_after_threshold_default_update/square_crops_contact_sheet.png",
+    "data/debug/test_four_piece_after_tuning/occupancy_crop_overlay.png",
+    "data/debug/test_four_piece_after_tuning/occupancy_diagnostics.json",
+    "data/debug/test_four_piece_after_tuning/occupancy_grid.png",
+    "data/debug/test_four_piece_after_tuning/square_crops_contact_sheet.png",
+    "data/debug/test_four_piece_colour_combinations/occupancy_crop_overlay.png",
+    "data/debug/test_four_piece_colour_combinations/occupancy_diagnostics.json",
+    "data/debug/test_four_piece_colour_combinations/occupancy_grid.png",
+    "data/debug/test_four_piece_colour_combinations/square_crops_contact_sheet.png",
+    "data/debug/test_four_piece_colour_combinations_final/occupancy_crop_overlay.png",
+    "data/debug/test_four_piece_colour_combinations_final/occupancy_diagnostics.json",
+    "data/debug/test_four_piece_colour_combinations_final/occupancy_grid.png",
+    "data/debug/test_four_piece_colour_combinations_final/square_crops_contact_sheet.png",
+    "data/debug/test_four_piece_threshold_012_006/occupancy_crop_overlay.png",
+    "data/debug/test_four_piece_threshold_012_006/occupancy_diagnostics.json",
+    "data/debug/test_four_piece_threshold_012_006/occupancy_grid.png",
+    "data/debug/test_four_piece_threshold_012_006/square_crops_contact_sheet.png",
+    "data/debug/test_no_reference_after_tuning/occupancy_crop_overlay.png",
+    "data/debug/test_no_reference_after_tuning/occupancy_diagnostics.json",
+    "data/debug/test_no_reference_after_tuning/occupancy_grid.png",
+    "data/debug/test_no_reference_after_tuning/square_crops_contact_sheet.png",
+    "data/debug/test_piece_d4_dark_on_dark/occupancy_crop_overlay.png",
+    "data/debug/test_piece_d4_dark_on_dark/occupancy_diagnostics.json",
+    "data/debug/test_piece_d4_dark_on_dark/occupancy_grid.png",
+    "data/debug/test_piece_d4_dark_on_dark/square_crops_contact_sheet.png",
+    "data/debug/test_piece_d5_light_on_light/occupancy_crop_overlay.png",
+    "data/debug/test_piece_d5_light_on_light/occupancy_diagnostics.json",
+    "data/debug/test_piece_d5_light_on_light/occupancy_grid.png",
+    "data/debug/test_piece_d5_light_on_light/square_crops_contact_sheet.png",
+    "data/debug/test_piece_e4_dark_on_light/occupancy_crop_overlay.png",
+    "data/debug/test_piece_e4_dark_on_light/occupancy_diagnostics.json",
+    "data/debug/test_piece_e4_dark_on_light/occupancy_grid.png",
+    "data/debug/test_piece_e4_dark_on_light/square_crops_contact_sheet.png",
+    "data/debug/test_real_e2e4_committed_result.json",
+    "data/debug/test_real_e2e4_move_match_result.json",
+    "data/debug/test_transition_synthetic/transition_grid.png",
+    "data/debug/test_transition_synthetic/transition_result.json",
+    "data/debug/tmp_square_targets_teach_pose.yaml",
+    "data/debug/tool_approach_axes_a1.json",
+    "data/debug/tool_approach_axes_e4.json",
+    "data/debug/tool_approach_axes_h3.json",
+    "data/logs/camera_checks/overhead_ctrls_menus.txt",
+    "data/logs/camera_checks/overhead_v4l2_all.txt",
+    "data/logs/camera_checks/wrist_byid_ctrls_menus.txt",
+    "data/logs/camera_checks/wrist_byid_formats.txt",
+    "data/logs/camera_checks/wrist_ctrls.txt",
+    "data/logs/camera_checks/wrist_ctrls_menus.txt",
+    "data/logs/camera_checks/wrist_formats.txt",
+    "data/logs/camera_checks/wrist_v4l2_all.txt",
+    "data/logs/demo_game.csv",
+    "data/logs/demo_game.log",
+    "data/logs/jog_and_save_square_pose.log",
+    "data/logs/keyboard_teleop.log",
+    "data/logs/movebook_physical_sequence.log",
+    "data/logs/open_loop_pick_place.log",
+    "data/logs/safe_square_transfer_validation.csv",
+    "data/logs/servo.log",
+    "data/logs/single_ik_pose_validation.csv",
+    "data/logs/square_above_motion.log",
+    "data/logs/vision.log",
+    "docs/BOARD_CALIBRATION.md",
+    "docs/CURRENT_SCOPE.md",
+    "docs/DECISIONS.md",
+    "docs/ENVIRONMENT.md",
+    "docs/EVALUATION_PLAN.md",
+    "docs/GRIPPER_SAFETY_AUDIT.md",
+    "docs/GRIPPER_SERVO_DIAGNOSTIC.md",
+    "docs/MASTER_CONTEXT.md",
+    "docs/TEST_PLAN.md",
+    "docs/npm-debug.log",
+    "tests/test_approach_orientation.py",
+    "tests/test_approach_policy.py",
+    "tests/test_audit_demo_movebook_calibration.py",
+    "tests/test_board_mapping.py",
+    "tests/test_board_profile.py",
+    "tests/test_board_state.py",
+    "tests/test_demo_game_flow.py",
+    "tests/test_demo_movebook.py",
+    "tests/test_explain_square_audit.py",
+    "tests/test_fk.py",
+    "tests/test_gripper_servo_diagnostics.py",
+    "tests/test_ik.py",
+    "tests/test_ik_seed_poses.py",
+    "tests/test_jacobian.py",
+    "tests/test_jog_and_save_square_pose.py",
+    "tests/test_joint_calibration.py",
+    "tests/test_joint_calibration_limits_audit.py",
+    "tests/test_joint_limits_profiles.py",
+    "tests/test_legal_move_matcher.py",
+    "tests/test_motion_primitives.py",
+    "tests/test_motion_safety.py",
+    "tests/test_movebook_physical_sequence.py",
+    "tests/test_open_loop_pick_place.py",
+    "tests/test_reachability.py",
+    "tests/test_robot_square_map.py",
+    "tests/test_safe_recovery.py",
+    "tests/test_safe_transfer.py",
+    "tests/test_single_ik_pose.py",
+    "tests/test_square_above_motion.py",
+    "tests/test_square_target_audit.py",
+    "tests/test_square_target_generation.py",
+    "tests/test_state_transition.py",
+    "tests/test_stockfish_engine.py",
+    "tests/test_task_planner.py",
+    "tests/test_teach_square_pose.py",
+    "tests/test_teleop_joints_keyboard.py",
+    "tests/test_tool_frames.py",
+    "tests/test_workspace.py",
+    "tests/test_zero_tick_midpoint_calibration.py",
+    "tools/analyse_square_ik.py",
+    "tools/analyse_square_reachability.py",
+    "tools/audit_demo_movebook_calibration.py",
+    "tools/audit_joint_calibration_limits.py",
+    "tools/audit_square_targets.py",
+    "tools/calibrate_board.py",
+    "tools/calibrate_gripper.py",
+    "tools/calibrate_home_pose.py",
+    "tools/calibrate_joint_limits.py",
+    "tools/calibrate_servos.py",
+    "tools/check_urdf_assets.py",
+    "tools/compare_saved_pose_fk.py",
+    "tools/detect_changed_squares.py",
+    "tools/detect_occupancy.py",
+    "tools/diagnose_gripper_servo_state.py",
+    "tools/explain_square_audit.py",
+    "tools/export_current_fk_pose.py",
+    "tools/extract_servo_metrics.py",
+    "tools/generate_charuco_board.py",
+    "tools/generate_square_targets.py",
+    "tools/inspect_joint_angles.py",
+    "tools/inspect_joint_limit_profiles.py",
+    "tools/inspect_servo_registers.py",
+    "tools/inspect_tool_approach_axes.py",
+    "tools/inspect_urdf_chain.py",
+    "tools/jog_and_save_square_pose.py",
+    "tools/list_square_targets.py",
+    "tools/match_human_move.py",
+    "tools/move_servo_small_step.py",
+    "tools/plan_robot_move.py",
+    "tools/plot_fk.py",
+    "tools/plot_workspace.py",
+    "tools/read_servo_positions.py",
+    "tools/recalibrate_zero_ticks_from_safety_limits.py",
+    "tools/recover_home.py",
+    "tools/report_servo_angle_limits.py",
+    "tools/resolve_move_plan.py",
+    "tools/run_demo_game.py",
+    "tools/run_game_dry.py",
+    "tools/run_movebook_physical_sequence.py",
+    "tools/save_current_ik_seed_pose.py",
+    "tools/scan_servos.py",
+    "tools/select_robot_move.py",
+    "tools/solve_ik_target.py",
+    "tools/teach_square_pose.py",
+    "tools/teleop_joints_keyboard.py",
+    "tools/test_camera.py",
+    "tools/test_gripper_monitored_motion.py",
+    "tools/test_open_loop_pick_place.py",
+    "tools/test_safe_square_transfer.py",
+    "tools/test_single_ik_pose.py",
+    "tools/test_square_above_motion.py",
+    "tools/test_stockfish.py",
+    "tools/validate_joint_calibration.py",
+    "tools/verify_environment.py"
+  ],
+  "generated_at": "2026-05-28T21:12:00Z",
+  "metrics": [
+    {
+      "calculation": "EXPECTED_ARM_JOINT_NAMES and FK unit test assertions",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "active arm-chain joints",
+      "source_files": [
+        "chess_robot/robot/urdf_model.py",
+        "tests/test_fk.py",
+        "data/analysis/thesis_kinematics_pytest_result.txt"
+      ],
+      "thesis_use": "methodology",
+      "value": "5 (shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll)"
+    },
+    {
+      "calculation": "Success rate = 28 / 28 x 100 = 100.0%",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "FK/Jacobian/IK/workspace/reachability unit test subset",
+      "source_files": [
+        "data/analysis/thesis_kinematics_pytest_result.txt"
+      ],
+      "thesis_use": "methodology",
+      "value": "28 passed / 28 run"
+    },
+    {
+      "calculation": "metadata.sample_count",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "workspace sample count",
+      "source_files": [
+        "data/debug/so101_square_reachability.json"
+      ],
+      "thesis_use": "methodology",
+      "value": "20000"
+    },
+    {
+      "calculation": "metadata.workspace_bounds_m",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "sampled workspace bounds min/max m",
+      "source_files": [
+        "data/debug/so101_square_reachability.json"
+      ],
+      "thesis_use": "results",
+      "value": "min=[-0.4377160258822751, -0.33632267111385883, -0.14047918882150057] max=[0.43340066910602204, 0.47638649473798, 0.6078149481045542]"
+    },
+    {
+      "calculation": "64 surface + 64 above + 2 capture targets",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "target positions evaluated",
+      "source_files": [
+        "data/debug/so101_square_reachability.json"
+      ],
+      "thesis_use": "results",
+      "value": "130"
+    },
+    {
+      "calculation": "Coverage = (reachable + marginal) / total x 100",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "square surface reachability",
+      "source_files": [
+        "data/debug/so101_square_reachability.json"
+      ],
+      "thesis_use": "results",
+      "value": "reachable=60, marginal=4, unreachable=0, coverage=100.0%"
+    },
+    {
+      "calculation": "Coverage = (reachable + marginal) / total x 100",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "square above reachability",
+      "source_files": [
+        "data/debug/so101_square_reachability.json"
+      ],
+      "thesis_use": "results",
+      "value": "reachable=48, marginal=16, unreachable=0, coverage=100.0%"
+    },
+    {
+      "calculation": "Coverage = (reachable + marginal) / total x 100",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "capture-zone surface reachability",
+      "source_files": [
+        "data/debug/so101_square_reachability.json"
+      ],
+      "thesis_use": "results",
+      "value": "reachable=1, marginal=0, unreachable=0, coverage=100.0%"
+    },
+    {
+      "calculation": "Coverage = (reachable + marginal) / total x 100",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "capture-zone above reachability",
+      "source_files": [
+        "data/debug/so101_square_reachability.json"
+      ],
+      "thesis_use": "results",
+      "value": "reachable=1, marginal=0, unreachable=0, coverage=100.0%"
+    },
+    {
+      "calculation": "Success rate = successful targets / total targets x 100",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "IK square surface",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "results",
+      "value": "success=64, marginal=0, failed=0, success_rate=100.0%"
+    },
+    {
+      "calculation": "Success rate = successful targets / total targets x 100",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "IK square above",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "results",
+      "value": "success=56, marginal=4, failed=4, success_rate=87.5%"
+    },
+    {
+      "calculation": "Success rate = successful targets / total targets x 100",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "IK capture-zone surface",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "results",
+      "value": "success=1, marginal=0, failed=0, success_rate=100.0%"
+    },
+    {
+      "calculation": "Success rate = successful targets / total targets x 100",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "IK capture-zone above",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "results",
+      "value": "success=1, marginal=0, failed=0, success_rate=100.0%"
+    },
+    {
+      "calculation": "Calculated from target.error_mm over 130 IK targets",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "modelled IK residuals",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "results",
+      "value": "mean=3.342 mm, median=1.866 mm, max=45.196 mm"
+    },
+    {
+      "calculation": "Calculated from 64 rows where target_type=square_surface",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "square_surface IK residuals",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "results",
+      "value": "mean=2.201 mm, median=1.959 mm, max=4.732 mm"
+    },
+    {
+      "calculation": "Calculated from 64 rows where target_type=square_above",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "square_above IK residuals",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "results",
+      "value": "mean=4.542 mm, median=1.827 mm, max=45.196 mm"
+    },
+    {
+      "calculation": "Count of target hit_limit_joints values",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "IK joint-limit hits by joint",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "discussion",
+      "value": "{'wrist_flex': 12, 'elbow_flex': 4}"
+    },
+    {
+      "calculation": "Names where status is failed or marginal",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "difficult square-above IK targets",
+      "source_files": [
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "discussion",
+      "value": "failed=['f8_above', 'e8_above', 'd8_above', 'c8_above'], marginal=['e7_above', 'd7_above', 'g8_above', 'b8_above']"
+    },
+    {
+      "calculation": "IK improvement = later success rate - earlier success rate",
+      "category": "Kinematics and reachability",
+      "confidence": "medium",
+      "evidence_status": "dry-run tested",
+      "metric": "IK square-above improvement from baseline to safety-recalibrated output",
+      "source_files": [
+        "data/debug/so101_square_ik.json",
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "discussion",
+      "value": "3.1 percentage points (84.4% to 87.5%)"
+    },
+    {
+      "calculation": "summary from audit report",
+      "category": "Kinematics and reachability",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "joint-limit audit violations",
+      "source_files": [
+        "data/debug/so101_joint_limit_audit.json"
+      ],
+      "thesis_use": "discussion",
+      "value": "{'ik_targets_audited': 130, 'targets_with_violations': 64, 'total_joint_rows': 650, 'total_joint_violations': 82, 'violations_per_joint': {'shoulder_pan': 0, 'shoulder_lift': 0, 'elbow_flex': 2, 'wrist_flex': 38, 'wrist_roll': 42}}"
+    },
+    {
+      "calculation": "Count of servo_map.joints",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "servos / joints represented",
+      "source_files": [
+        "data/calibration/robot/servo_map.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "6 (elbow_flex, gripper, shoulder_lift, shoulder_pan, wrist_flex, wrist_roll)"
+    },
+    {
+      "calculation": "Coverage = mapped joints / required six robot joints x 100",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "servo-to-joint mapping coverage",
+      "source_files": [
+        "data/calibration/robot/servo_map.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "100.0%"
+    },
+    {
+      "calculation": "Coverage = safety-limited arm joints / active arm-chain joints x 100",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "arm joint safety limits available",
+      "source_files": [
+        "data/calibration/robot/joint_safety_limits.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "100.0% (elbow_flex, shoulder_lift, shoulder_pan, wrist_flex, wrist_roll)"
+    },
+    {
+      "calculation": "Coverage = home-pose joints / required six robot joints x 100",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "home pose availability",
+      "source_files": [
+        "data/calibration/robot/home_pose.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "100.0% (elbow_flex, gripper, shoulder_lift, shoulder_pan, wrist_flex, wrist_roll)"
+    },
+    {
+      "calculation": "joint_calibration.calibration_method",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "tick-to-angle calibration method",
+      "source_files": [
+        "data/calibration/robot/joint_calibration.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "manual_robot_alignment_to_urdf_zero_pose"
+    },
+    {
+      "calculation": "joint_calibration.joints[*].zero_tick by urdf_joint",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "zero tick values",
+      "source_files": [
+        "data/calibration/robot/joint_calibration.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "{'shoulder_pan': 2075, 'elbow_flex': 1996, 'shoulder_lift': 2091, 'wrist_flex': 2003, 'wrist_roll': 2116}"
+    },
+    {
+      "calculation": "angle_deg = (tick - zero_tick) x 360 / ticks_per_rev",
+      "category": "Servo calibration and safety",
+      "confidence": "medium",
+      "evidence_status": "implemented only",
+      "metric": "converted arm safety ranges",
+      "source_files": [
+        "data/calibration/robot/joint_safety_limits.yaml",
+        "data/calibration/robot/joint_calibration.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "shoulder_pan=[-105.4,88.2]deg; shoulder_lift=[-108.5,100.3]deg; elbow_flex=[-94.3,91.8]deg; wrist_flex=[-97.5,87.7]deg; wrist_roll=[-175.4,163.7]deg"
+    },
+    {
+      "calculation": "Rows in safe_square_transfer_validation.csv grouped by mode",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "staged transfer validation trials",
+      "source_files": [
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "results",
+      "value": "54 total: dry_run=31 execute=23"
+    },
+    {
+      "calculation": "Success rate = non-aborted trials / total trials x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "staged transfer success rate overall",
+      "source_files": [
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "results",
+      "value": "68.5% (37/54)"
+    },
+    {
+      "calculation": "Success rate = non-aborted dry-run trials / dry-run trials x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "staged transfer dry-run success rate",
+      "source_files": [
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "results",
+      "value": "90.3% (28/31)"
+    },
+    {
+      "calculation": "Success rate = non-aborted execute trials / execute trials x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "staged transfer execute success rate",
+      "source_files": [
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "results",
+      "value": "39.1% (9/23)"
+    },
+    {
+      "calculation": "Error rate = aborted trials / total trials x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "failed/unsafe",
+      "metric": "aborted staged transfer trials",
+      "source_files": [
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "discussion",
+      "value": "31.5% (17/54)"
+    },
+    {
+      "calculation": "Frequency count of abort_reason for aborted rows",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "failed/unsafe",
+      "metric": "abort reason frequencies",
+      "source_files": [
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "discussion",
+      "value": "{'XY-changing board motion predicted min z 0.079919 m below low zone 0.086000 m.': 1, 'shoulder_lift final tick 2279 outside target 2198 +/- 80.': 1, 'XY-changing board motion predicted min z 0.065234 m below low zone 0.086000 m.': 1, 'IK failed: max_iters': 3, 'XY-changing board motion predicted min z 0.081504 m below low zone 0.086000 m.': 1, 'shoulder_lift final tick 2429 outside target 2335 +/- 80.': 1, 'Current position readback failed for wrist_roll.': 1, \"Could not open servo bus port '/dev/serial/by-id/usb-1a86_USB_Single_Serial_5AB0182700-if00': [Errno 16] Device or resource busy: '/dev/serial/by-id/usb-1a86_USB_Single_Serial_5AB0182700-if00'\": 1, 'XY-changing board motion predicted min z 0.081566 m below low zone 0.086000 m.': 1, 'XY-changing board motion predicted min z 0.079800 m below low zone 0.086000 m.': 1, 'XY-changing board motion predicted min z 0.080008 m below low zone 0.086000 m.': 1, 'XY-changing board motion predicted min z 0.074902 m below low zone 0.086000 m.': 1, 'XY-changing board motion predicted min z 0.072188 m below low zone 0.086000 m.': 1, 'shoulder_lift final tick 2892 outside target 2765 +/- 120.': 1, 'XY-changing board motion predicted min z 0.082293 m below low zone 0.086000 m.': 1}"
+    },
+    {
+      "calculation": "Clearance margin = measured/path min Z - low_zone_z; low_zone_z=0.086 m",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "failed/unsafe",
+      "metric": "minimum sampled path Z and worst clearance margin",
+      "source_files": [
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "discussion",
+      "value": "0.0652 m; margin=-0.0208 m"
+    },
+    {
+      "calculation": "Max of max_ik_error_mm over CSV rows",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "maximum staged-transfer IK residual",
+      "source_files": [
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "results",
+      "value": "6.064 mm"
+    },
+    {
+      "calculation": "Rows in single_ik_pose_validation.csv grouped by mode",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "single-IK validation log entries",
+      "source_files": [
+        "data/logs/single_ik_pose_validation.csv"
+      ],
+      "thesis_use": "results",
+      "value": "438 total: dry_run=248 execute=190"
+    },
+    {
+      "calculation": "Count rows where command_sent=True",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "single-IK command_sent count",
+      "source_files": [
+        "data/logs/single_ik_pose_validation.csv"
+      ],
+      "thesis_use": "results",
+      "value": "146 / 438"
+    },
+    {
+      "calculation": "Success rate = ik_success rows / total rows x 100",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "single-IK IK success rate",
+      "source_files": [
+        "data/logs/single_ik_pose_validation.csv"
+      ],
+      "thesis_use": "results",
+      "value": "96.1% (421/438)"
+    },
+    {
+      "calculation": "Error rate = rows with abort_reason / total rows x 100",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "failed/unsafe",
+      "metric": "single-IK abort records",
+      "source_files": [
+        "data/logs/single_ik_pose_validation.csv"
+      ],
+      "thesis_use": "discussion",
+      "value": "21.0% (92/438)"
+    },
+    {
+      "calculation": "Count abort_reason containing outside target",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "failed/unsafe",
+      "metric": "single-IK readback tolerance failures",
+      "source_files": [
+        "data/logs/single_ik_pose_validation.csv"
+      ],
+      "thesis_use": "discussion",
+      "value": "5"
+    },
+    {
+      "calculation": "Count abort_reason containing outside safety limits",
+      "category": "Servo calibration and safety",
+      "confidence": "high",
+      "evidence_status": "failed/unsafe",
+      "metric": "single-IK safety-limit aborts",
+      "source_files": [
+        "data/logs/single_ik_pose_validation.csv"
+      ],
+      "thesis_use": "discussion",
+      "value": "17"
+    },
+    {
+      "calculation": "Count segments with no abort_reason and ik_success not false",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "medium",
+      "evidence_status": "physically validated",
+      "metric": "safe-transfer segment success count in JSON artefacts",
+      "source_files": [
+        "data/debug/recover_home_a1_high_execute.json",
+        "data/debug/recover_home_dryrun.json",
+        "data/debug/recover_home_e4_high_execute.json",
+        "data/debug/safe_transfer_a1_dryrun.json",
+        "data/debug/safe_transfer_a1_high_above_only_dryrun.json",
+        "data/debug/safe_transfer_a1_high_above_only_execute.json",
+        "data/debug/safe_transfer_a1_high_above_recovery_test_execute.json",
+        "data/debug/safe_transfer_a1_policy_dryrun.json",
+        "data/debug/safe_transfer_a1_policy_execute.json",
+        "data/debug/safe_transfer_a1_return_home_timing_execute.json"
+      ],
+      "thesis_use": "results",
+      "value": "225 / 235"
+    },
+    {
+      "calculation": "Count segment.path_validation.passed values",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "medium",
+      "evidence_status": "physically validated",
+      "metric": "path validation pass/fail counts",
+      "source_files": [
+        "data/debug/recover_home_a1_high_execute.json",
+        "data/debug/recover_home_dryrun.json",
+        "data/debug/recover_home_e4_high_execute.json",
+        "data/debug/safe_transfer_a1_dryrun.json",
+        "data/debug/safe_transfer_a1_high_above_only_dryrun.json",
+        "data/debug/safe_transfer_a1_high_above_only_execute.json",
+        "data/debug/safe_transfer_a1_high_above_recovery_test_execute.json",
+        "data/debug/safe_transfer_a1_policy_dryrun.json",
+        "data/debug/safe_transfer_a1_policy_execute.json",
+        "data/debug/safe_transfer_a1_return_home_timing_execute.json"
+      ],
+      "thesis_use": "results",
+      "value": "pass=229, fail=6, total=235"
+    },
+    {
+      "calculation": "Piece-aware high requirement = piece_height_m + piece_clearance_margin_m",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "piece-aware high clearance requirement",
+      "source_files": [
+        "data/debug/safe_transfer_a1_high_above_only_dryrun.json",
+        "data/debug/safe_transfer_a1_high_above_only_execute.json",
+        "data/debug/safe_transfer_a1_high_above_recovery_test_execute.json",
+        "data/debug/safe_transfer_e4_high_above_only_execute.json",
+        "data/debug/safe_transfer_e4_high_above_recovery_test_execute.json"
+      ],
+      "thesis_use": "methodology",
+      "value": "5 passed / 5; requirement rows=[(0.054, 0.04, 0.094)]"
+    },
+    {
+      "calculation": "Success rate = successful high-above-only execute logs / high-above-only execute logs x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "high-above-only physical trials",
+      "source_files": [
+        "data/debug/safe_transfer_a1_high_above_only_execute.json",
+        "data/debug/safe_transfer_e4_high_above_only_execute.json"
+      ],
+      "thesis_use": "results",
+      "value": "2 / 2 succeeded"
+    },
+    {
+      "calculation": "Success rate = successful recovery-test execute logs / recovery-test execute logs x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "high-above recovery-test physical trials",
+      "source_files": [
+        "data/debug/safe_transfer_a1_high_above_recovery_test_execute.json",
+        "data/debug/safe_transfer_e4_high_above_recovery_test_execute.json"
+      ],
+      "thesis_use": "results",
+      "value": "2 / 2 succeeded"
+    },
+    {
+      "calculation": "Counts execute logs containing target_normal_above segment",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "normal-above/full transfer execute logs",
+      "source_files": [
+        "data/debug/safe_transfer_e4_policy_execute.json",
+        "data/debug/safe_transfer_e4_return_home_execute.json",
+        "data/debug/safe_transfer_e4_return_home_timing_execute.json",
+        "data/debug/safe_transfer_e4_vertical_approach_execute.json",
+        "data/debug/safe_transfer_a1_policy_execute.json",
+        "data/debug/safe_transfer_a1_return_home_timing_execute.json",
+        "data/debug/safe_transfer_a1_route_return_execute.json",
+        "data/debug/safe_transfer_a1_seeded_achieved_reverse_replay_execute.json",
+        "data/debug/safe_transfer_a1_seeded_execute.json",
+        "data/debug/safe_transfer_a1_seeded_reverse_replay_execute.json",
+        "data/debug/safe_transfer_e3_route_return_execute.json"
+      ],
+      "thesis_use": "discussion",
+      "value": "4 succeeded, 7 failed/aborted"
+    },
+    {
+      "calculation": "Count successful execute logs containing home_high or home_pose segments",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "return-home segment physical success logs",
+      "source_files": [
+        "data/debug/safe_transfer_e4_policy_execute.json",
+        "data/debug/safe_transfer_e4_return_home_execute.json",
+        "data/debug/safe_transfer_e4_return_home_timing_execute.json",
+        "data/debug/safe_transfer_e4_vertical_approach_execute.json"
+      ],
+      "thesis_use": "results",
+      "value": "4"
+    },
+    {
+      "calculation": "Success rate = successful route_return execute logs / route_return execute logs x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "failed/unsafe",
+      "metric": "route-return physical trials",
+      "source_files": [
+        "data/debug/safe_transfer_a1_route_return_execute.json",
+        "data/debug/safe_transfer_e3_route_return_execute.json"
+      ],
+      "thesis_use": "discussion",
+      "value": "0 / 2 succeeded"
+    },
+    {
+      "calculation": "Success rate = successful recovery execute logs / recovery execute logs x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "recovery-to-home execute success rate",
+      "source_files": [
+        "data/debug/recover_home_a1_high_execute.json",
+        "data/debug/recover_home_e4_high_execute.json"
+      ],
+      "thesis_use": "results",
+      "value": "100.0% (2/2)"
+    },
+    {
+      "calculation": "Recovery frequency = recovery events / total staged transfer trials x 100",
+      "category": "Safe transfer and motion primitives",
+      "confidence": "medium",
+      "evidence_status": "physically validated",
+      "metric": "recovery frequency relative to staged transfer CSV trials",
+      "source_files": [
+        "data/debug/recover_home_a1_high_execute.json",
+        "data/debug/recover_home_e4_high_execute.json",
+        "data/logs/safe_square_transfer_validation.csv"
+      ],
+      "thesis_use": "discussion",
+      "value": "3.7% (2/54)"
+    },
+    {
+      "calculation": "64 chessboard squares in generated reachability and IK target sets",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "model-tested board squares",
+      "source_files": [
+        "data/debug/so101_square_reachability.json",
+        "data/debug/so101_square_ik_safety_recalibrated_fast.json"
+      ],
+      "thesis_use": "results",
+      "value": "64"
+    },
+    {
+      "calculation": "Coverage = square target entries / 64 x 100 = 100.0%",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "square target table coverage",
+      "source_files": [
+        "data/calibration/robot/square_targets.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "64 squares: manual=16 generated=48"
+    },
+    {
+      "calculation": "Count approach_policy.squares",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "squares with approach policy overrides",
+      "source_files": [
+        "data/calibration/robot/approach_policy.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "0"
+    },
+    {
+      "calculation": "Count ik_seed_poses.squares and non-empty seed_ticks",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "squares with IK seed poses",
+      "source_files": [
+        "data/calibration/robot/ik_seed_poses.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "3 configured, 1 with seed_ticks (a1)"
+    },
+    {
+      "calculation": "Unique square names from successful single_ik_pose_*_above*_execute.json with command_sent=True",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "squares physically tested with single-IK above commands",
+      "source_files": [
+        "data/debug/single_ik_pose_home_return_after_a8_locked_execute.json",
+        "data/debug/single_ik_pose_home_return_after_e4_locked_execute.json",
+        "data/debug/single_ik_pose_h1_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_g3_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_home_return_after_e8_locked_execute.json",
+        "data/debug/single_ik_pose_f4_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_a1_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_home_return_after_a1_locked_execute.json",
+        "data/debug/single_ik_pose_home_return_after_h8_locked_execute.json",
+        "data/debug/single_ik_pose_d4_above_execute.json",
+        "data/debug/single_ik_pose_home_return_after_g3_locked_execute.json",
+        "data/debug/single_ik_pose_a3_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_home_return_after_e1_locked_execute.json",
+        "data/debug/single_ik_pose_e2_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_home_return_after_e6_locked_execute.json",
+        "data/debug/single_ik_pose_a4_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_h8_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_f8_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_e1_above_wristroll_locked_execute.json",
+        "data/debug/single_ik_pose_h4_above_wristroll_locked_execute.json"
+      ],
+      "thesis_use": "results",
+      "value": "33 unique squares (a1, a2, a3, a4, a5, a6, a7, a8, b4, c3, c4, c5, d1, d4, e1, e2, e3, e4, e5, e6, e8, f4, f8, g3, g4, g8, h1, h3, h4, h5, h6, h7, h8)"
+    },
+    {
+      "calculation": "Count per_square_results where status=ok in square_above_motion*_real.json",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "physical above-square joint-space motions",
+      "source_files": [
+        "data/debug/square_above_motion_c3_real.json",
+        "data/debug/square_above_motion_c4_real.json",
+        "data/debug/square_above_motion_corner_loop_real.json"
+      ],
+      "thesis_use": "results",
+      "value": "7 successful stage motions over 6 unique squares (a1, a8, c3, c4, h1, h8)"
+    },
+    {
+      "calculation": "tool_frames.yaml",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "gripper frame / tool frame status",
+      "source_files": [
+        "data/calibration/gripper/tool_frames.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "default_tcp=gripper_frame, frames=['fixed_jaw_contact', 'gripper_frame', 'held_piece_center']"
+    },
+    {
+      "calculation": "gripper.calibration_status",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "high",
+      "evidence_status": "implemented only",
+      "metric": "gripper profile status",
+      "source_files": [
+        "data/calibration/gripper/gripper_profile.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "calibrated_after_lerobot_recalibration"
+    },
+    {
+      "calculation": "Counts open_loop_pick_place*.json",
+      "category": "Robot-square and gripper calibration",
+      "confidence": "medium",
+      "evidence_status": "physically validated",
+      "metric": "open-loop pick/place artefacts",
+      "source_files": [
+        "data/debug/open_loop_pick_place_c3_c3_dry_run.json",
+        "data/debug/open_loop_pick_place_c3_c3_real.json",
+        "data/debug/open_loop_pick_place_e7_e5_home_dry_run.json"
+      ],
+      "thesis_use": "results",
+      "value": "real_success=1/1, dry_run=2, stage_statuses={'dry_run': 23, 'ok': 11, 'waiting': 6}"
+    },
+    {
+      "calculation": "sample_count and reprojection_rmse_px",
+      "category": "Vision/perception/chess logic",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "overhead camera calibration",
+      "source_files": [
+        "data/calibration/cameras/overhead_calibration.json"
+      ],
+      "thesis_use": "methodology",
+      "value": "20 samples, reprojection_rmse_px=0.677"
+    },
+    {
+      "calculation": "sample_count and reprojection_rmse_px",
+      "category": "Vision/perception/chess logic",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "wrist camera calibration",
+      "source_files": [
+        "data/calibration/cameras/wrist_calibration.json"
+      ],
+      "thesis_use": "methodology",
+      "value": "20 samples, reprojection_rmse_px=0.476"
+    },
+    {
+      "calculation": "Coverage = board profile squares / 64 x 100 = 100.0%",
+      "category": "Vision/perception/chess logic",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "board calibration coverage",
+      "source_files": [
+        "data/calibration/board/board_profile.yaml"
+      ],
+      "thesis_use": "methodology",
+      "value": "64 squares, 9x9 manual grid"
+    },
+    {
+      "calculation": "Success rate = passed scenarios / total scenarios x 100 = 100.0%",
+      "category": "Vision/perception/chess logic",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "changed-square acceptance scenarios",
+      "source_files": [
+        "data/debug/changed_square_acceptance/20260518_191453/acceptance_summary.json"
+      ],
+      "thesis_use": "results",
+      "value": "5 / 5 passed"
+    },
+    {
+      "calculation": "Success rate = expected transition passes / expected transitions x 100",
+      "category": "Vision/perception/chess logic",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "move/add/remove transition inference",
+      "source_files": [
+        "data/debug/changed_square_acceptance/20260518_191453/acceptance_summary.json"
+      ],
+      "thesis_use": "results",
+      "value": "3 / 3 expected transitions passed"
+    },
+    {
+      "calculation": "accepted_move=e2e4 committed=True",
+      "category": "Vision/perception/chess logic",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "real e2e4 move inference and commit",
+      "source_files": [
+        "data/debug/test_real_e2e4_committed_result.json"
+      ],
+      "thesis_use": "results",
+      "value": "unique"
+    },
+    {
+      "calculation": "Success rate = successful dry-run demo rows / total demo rows x 100",
+      "category": "Vision/perception/chess logic",
+      "confidence": "high",
+      "evidence_status": "dry-run tested",
+      "metric": "dry-run demo-game rows",
+      "source_files": [
+        "data/logs/demo_game.csv"
+      ],
+      "thesis_use": "results",
+      "value": "2 / 2 execution+verification successful"
+    },
+    {
+      "calculation": "Success rate = execution_success / attempted; Coverage = records / move_total x 100",
+      "category": "Vision/perception/chess logic",
+      "confidence": "high",
+      "evidence_status": "physically validated",
+      "metric": "movebook physical sequence progress",
+      "source_files": [
+        "data/debug/movebook_physical_sequence_last.json"
+      ],
+      "thesis_use": "results",
+      "value": "1 / 1 attempted moves succeeded; planned coverage=25.0%"
+    },
+    {
+      "calculation": "Record measured TCP or piece centre error for a representative square set using camera/AprilTag/ruler ground truth.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "External ground-truth TCP or piece placement error per square",
+      "source_files": [],
+      "thesis_use": "results and presentation",
+      "value": "not evidenced"
+    },
+    {
+      "calculation": "Repeated pawn pick/place trials by square and piece colour with success/failure and failure mode.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "Pawn grasp success rate",
+      "source_files": [],
+      "thesis_use": "results and discussion",
+      "value": "not evidenced"
+    },
+    {
+      "calculation": "Per-square safe transfer attempts with mode, square, command_sent, aborted, abort_reason, min_path_z_m, and readback error.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "Full 64-square physical transfer coverage",
+      "source_files": [],
+      "thesis_use": "results and presentation",
+      "value": "not evidenced"
+    },
+    {
+      "calculation": "Physical transfer trials to and from capture zone with piece present and command/readback records.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "Capture-zone physical pick/place success",
+      "source_files": [],
+      "thesis_use": "results",
+      "value": "not evidenced"
+    },
+    {
+      "calculation": "Before/after wrist-camera alignment error in pixels and mm over repeated trials.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "Visual servo correction error reduction",
+      "source_files": [],
+      "thesis_use": "discussion and presentation",
+      "value": "not evidenced"
+    },
+    {
+      "calculation": "Solved hand-eye transform file plus reprojection/pose residuals from calibration samples.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "Hand-eye calibration transform and residual",
+      "source_files": [],
+      "thesis_use": "methodology and discussion",
+      "value": "not evidenced"
+    },
+    {
+      "calculation": "Multiple physical game or movebook sequences with planned moves, attempted moves, completed moves, failures, and verification.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "End-to-end physical game success rate",
+      "source_files": [],
+      "thesis_use": "results and presentation",
+      "value": "not evidenced"
+    },
+    {
+      "calculation": "For every abort class, log whether recovery was needed, attempted, and completed.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "Representative recovery success after induced aborts",
+      "source_files": [],
+      "thesis_use": "discussion",
+      "value": "not evidenced"
+    },
+    {
+      "calculation": "Per-command target ticks, final readback ticks, error ticks, tolerance, and joint name.",
+      "category": "Missing metrics",
+      "confidence": "high",
+      "evidence_status": "not evidenced",
+      "metric": "Readback tolerance distribution by joint after physical commands",
+      "source_files": [],
+      "thesis_use": "results and discussion",
+      "value": "not evidenced"
+    }
+  ],
+  "missing_metrics": [
+    {
+      "exact test/log needed": "Record measured TCP or piece centre error for a representative square set using camera/AprilTag/ruler ground truth.",
+      "metric name": "External ground-truth TCP or piece placement error per square",
+      "needed for": "results and presentation",
+      "suggested command or procedure": "Run a non-blind validation procedure that logs target square, commanded pose, measured x/y/z, and residual_mm to data/evaluation/physical_square_accuracy.csv.",
+      "why it matters": "Separates modelled IK residual from physical positioning accuracy at the chessboard."
+    },
+    {
+      "exact test/log needed": "Repeated pawn pick/place trials by square and piece colour with success/failure and failure mode.",
+      "metric name": "Pawn grasp success rate",
+      "needed for": "results and discussion",
+      "suggested command or procedure": "Use a supervised physical grasp protocol; do not run blind normal-above descent until wrist-camera correction is active.",
+      "why it matters": "The chess task requires reliable grasping, and current logs do not quantify pawn pick success."
+    },
+    {
+      "exact test/log needed": "Per-square safe transfer attempts with mode, square, command_sent, aborted, abort_reason, min_path_z_m, and readback error.",
+      "metric name": "Full 64-square physical transfer coverage",
+      "needed for": "results and presentation",
+      "suggested command or procedure": "Execute only staged high-above validation first, then expand with wrist-camera verified descent.",
+      "why it matters": "Model-tested coverage is complete, but physical validation currently covers a subset of squares and primitives."
+    },
+    {
+      "exact test/log needed": "Physical transfer trials to and from capture zone with piece present and command/readback records.",
+      "metric name": "Capture-zone physical pick/place success",
+      "needed for": "results",
+      "suggested command or procedure": "Add capture-zone entries to supervised transfer validation and log the same fields as safe_square_transfer_validation.csv.",
+      "why it matters": "Capture handling is part of chess move execution but only model reachability/IK evidence was found."
+    },
+    {
+      "exact test/log needed": "Before/after wrist-camera alignment error in pixels and mm over repeated trials.",
+      "metric name": "Visual servo correction error reduction",
+      "needed for": "discussion and presentation",
+      "suggested command or procedure": "Log initial offset, correction vector, final offset, convergence steps, and success flag for each wrist-camera servo trial.",
+      "why it matters": "Discussion claims that IK is coarse positioning need a quantitative next-subsystem target."
+    },
+    {
+      "exact test/log needed": "Solved hand-eye transform file plus reprojection/pose residuals from calibration samples.",
+      "metric name": "Hand-eye calibration transform and residual",
+      "needed for": "methodology and discussion",
+      "suggested command or procedure": "Use saved teleop poses to solve hand-eye calibration and write transform/residual report under data/calibration/hand_eye/.",
+      "why it matters": "Wrist camera calibration exists, but robot-to-camera transform quality is not evidenced."
+    },
+    {
+      "exact test/log needed": "Multiple physical game or movebook sequences with planned moves, attempted moves, completed moves, failures, and verification.",
+      "metric name": "End-to-end physical game success rate",
+      "needed for": "results and presentation",
+      "suggested command or procedure": "Run a supervised movebook evaluation after wrist-camera descent and grasp logging are in place.",
+      "why it matters": "The repo has one physical movebook record, not enough to claim full game reliability."
+    },
+    {
+      "exact test/log needed": "For every abort class, log whether recovery was needed, attempted, and completed.",
+      "metric name": "Representative recovery success after induced aborts",
+      "needed for": "discussion",
+      "suggested command or procedure": "Extend safe transfer validation CSV with recovery_needed, recovery_attempted, recovery_success, and final_home_readback fields.",
+      "why it matters": "Recovery-to-home logs are successful, but the denominator over realistic abort conditions is not established."
+    },
+    {
+      "exact test/log needed": "Per-command target ticks, final readback ticks, error ticks, tolerance, and joint name.",
+      "metric name": "Readback tolerance distribution by joint after physical commands",
+      "needed for": "results and discussion",
+      "suggested command or procedure": "Aggregate existing per-segment readback_errors_ticks into a CSV and add the same output to future execute logs.",
+      "why it matters": "Several aborts are readback-related; distribution by joint would support safety-limit tuning."
+    }
+  ],
+  "parse_failures": [],
+  "repo_root": "/data/chess_robot"
+}

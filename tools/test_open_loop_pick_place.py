@@ -32,6 +32,7 @@ DEFAULT_JOINT_LIMITS_PATH = os.path.join(ROOT, "data", "calibration", "robot", "
 DEFAULT_SERVO_MAP_PATH = os.path.join(ROOT, "data", "calibration", "robot", "servo_map.yaml")
 DEFAULT_GRIPPER_PROFILE_PATH = os.path.join(ROOT, "data", "calibration", "gripper", "gripper_profile.yaml")
 DEFAULT_ROBOT_CONFIG_PATH = os.path.join(ROOT, "configs", "robot.yaml")
+DEFAULT_HOME_POSE_PATH = os.path.join(ROOT, "data", "calibration", "robot", "home_pose.yaml")
 DEFAULT_LOG_PATH = os.path.join(ROOT, "data", "logs", "open_loop_pick_place.log")
 DEFAULT_OUTPUT_JSON_PATH = os.path.join(ROOT, "data", "debug", "open_loop_pick_place_c3_c3_dry_run.json")
 DEFAULT_SOURCE = "c3"
@@ -332,6 +333,58 @@ def _validate_gripper_positions(gripper_profile, joint_limits, servo_map):
     }
 
 
+
+
+def _load_home_pose(path):
+    if not path:
+        raise OpenLoopPickPlaceError("--home-pose is required when --return-home-after is used.")
+    if not os.path.exists(path):
+        raise OpenLoopPickPlaceError("home pose file does not exist: {}".format(path))
+    document = robot_square_map.load_yaml_file(path, {}) or {}
+    joints = document.get("joints") if isinstance(document, dict) else None
+    if not isinstance(joints, dict):
+        raise OpenLoopPickPlaceError("home_pose.yaml must contain a top-level joints mapping.")
+    return document
+
+
+def _home_pose_joint_position(joint_name, raw_entry):
+    if isinstance(raw_entry, dict):
+        if "position" not in raw_entry:
+            raise OpenLoopPickPlaceError("home_pose joint {} is missing position.".format(joint_name))
+        return raw_entry.get("position")
+    return raw_entry
+
+
+def _validate_home_pose(path, movement_joints, known_joint_names, joint_limits):
+    document = _load_home_pose(path)
+    joints = document.get("joints") or {}
+    unknown = [joint_name for joint_name in sorted(joints.keys()) if joint_name not in known_joint_names]
+    if unknown:
+        raise OpenLoopPickPlaceError("home_pose includes unknown joints: {}".format(", ".join(unknown)))
+
+    validated_positions = {}
+    for joint_name in sorted(joints.keys()):
+        value = _home_pose_joint_position(joint_name, joints.get(joint_name))
+        validated_positions[joint_name] = _validate_joint_value(
+            joint_name,
+            int(value),
+            joint_limits,
+            "home_pose",
+        )
+
+    target_joints = {}
+    for joint_name in movement_joints:
+        if joint_name not in joints:
+            raise OpenLoopPickPlaceError("home_pose is missing required joint {}.".format(joint_name))
+        target_joints[joint_name] = int(validated_positions[joint_name])
+    return {
+        "square": "home",
+        "pose_name": "home_pose",
+        "source": document.get("source") or "unknown",
+        "target_joints": target_joints,
+        "raw_joints": dict(joints),
+    }
+
 def validate_inputs(args, config_loader=load_robot_config):
     source = robot_square_map.normalise_square_name(args.source)
     dest = robot_square_map.normalise_square_name(args.dest)
@@ -433,6 +486,14 @@ def validate_inputs(args, config_loader=load_robot_config):
 
     gripper = _validate_gripper_positions(gripper_profile, joint_limits, servo_map)
     ids_by_joint = _servo_ids_by_joint(servo_map, movement_joints + ["gripper"])
+    home_pose = None
+    if bool(getattr(args, "return_home_after", False)):
+        home_pose = _validate_home_pose(
+            getattr(args, "home_pose", DEFAULT_HOME_POSE_PATH),
+            movement_joints,
+            known_joint_names,
+            joint_limits,
+        )
 
     config = None
     if args.real:
@@ -459,6 +520,7 @@ def validate_inputs(args, config_loader=load_robot_config):
         "source_pick": source_pick_entry,
         "dest_above": dest_above_entry,
         "dest_place": dest_place_entry,
+        "home_pose": home_pose,
         "gripper": gripper,
         "config": config,
     }
@@ -519,6 +581,8 @@ def build_stage_sequence(validation, pause_each):
     add_arm_stage("move_dest_above_after_place", validation["dest_above"], "above_pose", validation["dest"])
     if positions.get("neutral_position") is not None:
         add_gripper_stage("move_gripper_neutral", "neutral_position")
+    if validation.get("home_pose") is not None:
+        add_arm_stage("move_home_after_place", validation["home_pose"], "home_pose", "home")
 
     last_arm_target = None
     last_gripper_target = None
@@ -566,6 +630,7 @@ def _command_hint(args):
         "--servo-map", _display_path(args.servo_map),
         "--gripper-profile", _display_path(args.gripper_profile),
         "--robot-config", _display_path(args.robot_config),
+        "--home-pose", _display_path(getattr(args, "home_pose", DEFAULT_HOME_POSE_PATH)),
         "--real",
         "--confirm-text", EXPECTED_CONFIRM_TEXT,
         "--pause-each",
@@ -578,6 +643,8 @@ def _command_hint(args):
         "--log", _display_path(args.log),
         "--output-json", _display_path(output_json),
     ])
+    if bool(getattr(args, "return_home_after", False)):
+        command.append("--return-home-after")
     return " ".join([shlex.quote(part) for part in command])
 
 
@@ -591,6 +658,8 @@ def _build_result(args, validation, stages, pause_each):
         "dest": validation["dest"],
         "piece": args.piece,
         "allow_same_square": bool(args.allow_same_square),
+        "return_home_after": bool(getattr(args, "return_home_after", False)),
+        "home_pose_path": getattr(args, "home_pose", DEFAULT_HOME_POSE_PATH),
         "sequence_stages": _stage_name_list(stages),
         "arm_movement_joints": list(validation["movement_joints"]),
         "gripper_commanded": True,
@@ -662,6 +731,8 @@ def _print_dry_run_summary(validation, stages, args):
     print("Dest: {}".format(validation["dest"]))
     print("Piece: {}".format(args.piece))
     print("Required poses found: source above/pick, dest above/place")
+    if bool(getattr(args, "return_home_after", False)):
+        print("Return home after place: enabled")
     print("Required poses missing: none")
     print("Movement joints: {}".format(", ".join(validation["movement_joints"])))
     print("Arm target sequence:")
@@ -959,6 +1030,8 @@ def build_parser():
                         help="Gripper profile YAML path.")
     parser.add_argument("--robot-config", default=DEFAULT_ROBOT_CONFIG_PATH,
                         help="Robot config YAML path.")
+    parser.add_argument("--home-pose", default=DEFAULT_HOME_POSE_PATH,
+                        help="Home pose YAML path.")
     parser.add_argument("--real", action="store_true", help="Enable real hardware motion.")
     parser.add_argument("--confirm-text", default=None,
                         help="Exact required confirmation text for real mode.")
@@ -981,6 +1054,8 @@ def build_parser():
                         help="Allow same-square source/dest in real mode.")
     parser.add_argument("--allow-place-uses-pick", action="store_true",
                         help="Allow dest pick_pose fallback when place_pose is missing.")
+    parser.add_argument("--return-home-after", action="store_true",
+                        help="Return to the saved home pose after placing and neutraling the gripper.")
     return parser
 
 

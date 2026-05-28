@@ -338,19 +338,6 @@ squares:
       notes:
       - requires manual validation before playback
       source: generated
-    pick_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2749
-        gripper: 1602
-        shoulder_lift: 2020
-        shoulder_pan: 2595
-        wrist_flex: 2273
-        wrist_roll: 1031
-      notes:
-      - original movebook pick pose b8c6
-      recorded_at: '2026-05-27T06:24:24Z'
-      source: manual
   c1:
     above_pose:
       confidence: taught
@@ -468,19 +455,6 @@ squares:
       notes:
       - requires manual validation before playback
       source: generated
-    place_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2404
-        gripper: 1603
-        shoulder_lift: 2217
-        shoulder_pan: 2267
-        wrist_flex: 2340
-        wrist_roll: 1088
-      notes:
-      - original movebook place pose f8c5
-      recorded_at: '2026-05-27T06:28:07Z'
-      source: manual
   c6:
     above_pose:
       confidence: taught
@@ -494,19 +468,6 @@ squares:
       notes:
       - manual safe above-square anchor
       recorded_at: '2026-05-20T18:16:08Z'
-      source: manual
-    place_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2578
-        gripper: 1594
-        shoulder_lift: 2090
-        shoulder_pan: 2305
-        wrist_flex: 2312
-        wrist_roll: 1032
-      notes:
-      - original movebook place pose b8c6
-      recorded_at: '2026-05-27T06:25:10Z'
       source: manual
   c7:
     above_pose:
@@ -795,19 +756,6 @@ squares:
       notes:
       - requires manual validation before playback
       source: generated
-    place_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2182
-        gripper: 1619
-        shoulder_lift: 2359
-        shoulder_pan: 2038
-        wrist_flex: 2318
-        wrist_roll: 1080
-      notes:
-      - original e5e4
-      recorded_at: '2026-05-27T07:24:44Z'
-      source: manual
   e5:
     above_pose:
       confidence: high
@@ -829,32 +777,6 @@ squares:
       notes:
       - requires manual validation before playback
       source: generated
-    pick_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2454
-        gripper: 1623
-        shoulder_lift: 2236
-        shoulder_pan: 2036
-        wrist_flex: 2099
-        wrist_roll: 1081
-      notes:
-      - original e5e4
-      recorded_at: '2026-05-27T07:24:26Z'
-      source: manual
-    place_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2407
-        gripper: 1601
-        shoulder_lift: 2184
-        shoulder_pan: 2042
-        wrist_flex: 2394
-        wrist_roll: 1009
-      notes:
-      - original movebook place pose e7e5
-      recorded_at: '2026-05-27T06:23:48Z'
-      source: manual
   e6:
     above_pose:
       confidence: high
@@ -900,15 +822,15 @@ squares:
     pick_pose:
       confidence: taught
       joints:
-        elbow_flex: 2571
-        gripper: 1599
-        shoulder_lift: 2101
-        shoulder_pan: 2023
-        wrist_flex: 2372
-        wrist_roll: 1005
+        elbow_flex: 2805
+        gripper: 1604
+        shoulder_lift: 2000
+        shoulder_pan: 2021
+        wrist_flex: 2202
+        wrist_roll: 1019
       notes:
-      - original movebook pick pose e7e5
-      recorded_at: '2026-05-27T07:08:06Z'
+      - pawn pick pose for demo e7e5
+      recorded_at: '2026-05-27T06:18:56Z'
       source: manual
   e8:
     above_pose:
@@ -1036,19 +958,6 @@ squares:
       - manual safe above-square anchor
       recorded_at: '2026-05-20T18:16:43Z'
       source: manual
-    place_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2604
-        gripper: 1603
-        shoulder_lift: 2112
-        shoulder_pan: 1893
-        wrist_flex: 2250
-        wrist_roll: 1028
-      notes:
-      - original movebook place pose g8f6
-      recorded_at: '2026-05-27T06:26:32Z'
-      source: manual
   f7:
     above_pose:
       confidence: high
@@ -1083,19 +992,6 @@ squares:
       notes:
       - manual safe above-square anchor
       recorded_at: '2026-05-20T18:11:14Z'
-      source: manual
-    pick_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2859
-        gripper: 1604
-        shoulder_lift: 1957
-        shoulder_pan: 1703
-        wrist_flex: 2195
-        wrist_roll: 1091
-      notes:
-      - original movebook pick pose f8c5
-      recorded_at: '2026-05-27T06:27:15Z'
       source: manual
   g1:
     above_pose:
@@ -1265,19 +1161,6 @@ squares:
       notes:
       - requires manual validation before playback
       source: generated
-    pick_pose:
-      confidence: taught
-      joints:
-        elbow_flex: 2810
-        gripper: 1603
-        shoulder_lift: 1972
-        shoulder_pan: 1562
-        wrist_flex: 2240
-        wrist_roll: 1002
-      notes:
-      - original movebook pick pose g8f6
-      recorded_at: '2026-05-27T06:25:46Z'
-      source: manual
   h1:
     above_pose:
       confidence: taught

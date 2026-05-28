@@ -1,0 +1,2 @@
+Command: .venv/bin/python -m pytest tests/test_fk.py tests/test_jacobian.py tests/test_ik.py tests/test_workspace.py tests/test_reachability.py -q
+Result: 28 passed in 11.66s

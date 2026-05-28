@@ -1,0 +1,7 @@
+joint_name,servo_id,saved_register_9_value,saved_register_11_value,saved_register_9_timestamp,saved_register_11_timestamp,calibrated,evidence_source
+shoulder_pan,1,876,3113,2026-05-26T04:06:27.667572Z,2026-05-26T04:06:27.668259Z,true,servo.log servo_read_register address 9/11
+shoulder_lift,2,857,3230,2026-05-26T04:06:27.668965Z,2026-05-26T04:06:27.669491Z,true,servo.log servo_read_register address 9/11
+elbow_flex,3,837,3041,2026-05-26T04:06:27.670132Z,2026-05-26T04:06:27.670773Z,true,servo.log servo_read_register address 9/11
+wrist_flex,4,776,3110,2026-05-26T04:06:27.671333Z,2026-05-26T04:06:27.671958Z,true,servo.log servo_read_register address 9/11
+wrist_roll,5,0,4095,2026-05-26T04:06:27.672473Z,2026-05-26T04:06:27.672972Z,true,servo.log servo_read_register address 9/11
+gripper,6,1460,2880,2026-05-27T04:13:52.090599Z,2026-05-27T04:13:52.091200Z,true,servo.log servo_read_register address 9/11

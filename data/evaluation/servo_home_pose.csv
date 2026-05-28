@@ -1,0 +1,7 @@
+joint_name,home_position,within_min_max,distance_from_min,distance_from_max,min_limit,max_limit
+shoulder_pan,1074,true,198,2004,876,3078
+shoulder_lift,1990,true,1133,1242,857,3232
+elbow_flex,1857,true,934,1183,923,3040
+wrist_flex,2706,true,1561,229,1145,2935
+wrist_roll,1091,true,712,1259,379,2350
+gripper,1602,true,139,136,1463,1738

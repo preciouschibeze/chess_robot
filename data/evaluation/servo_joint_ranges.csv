@@ -1,0 +1,7 @@
+joint_name,provisional_min,provisional_max,neutral,margin_ticks,span_ticks,calibrated,direction_sign,physical_direction_description
+shoulder_pan,876,3078,1074,20,2202,true,1,increasing ticks rotates the arm clockwise when viewed from above
+shoulder_lift,857,3232,895,20,2375,true,1,increasing ticks raises the upper arm
+elbow_flex,923,3040,3030,20,2117,true,1,increasing ticks bends the elbow inward
+wrist_flex,1145,2935,1905,20,1790,true,1,increasing ticks lowers the gripper tip when viewed from the side
+wrist_roll,379,2350,1093,20,1971,true,1,increasing ticks rotates wrist clockwise when viewed from the gripper end
+gripper,1463,1738,1616,10,275,true,-1,decreasing ticks closes the moving jaw against the fixed jaw

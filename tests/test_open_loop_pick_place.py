@@ -85,6 +85,17 @@ def _targets(include_dest_place=True, source_pick_source="manual", dest_place_so
     return document
 
 
+def _home_pose(seed=2600):
+    joints = {}
+    for index, joint_name in enumerate(JOINT_ORDER):
+        position = 1600 if joint_name == "gripper" else seed + index + 1
+        joints[joint_name] = {"id": index + 1, "position": position}
+    return {
+        "source": "test",
+        "joints": joints,
+    }
+
+
 def _gripper_profile(open_position=1704, grasp_position=1536, release_position=1652,
                      neutral_position=1616, pre_grasp_position=1596):
     profile = {
@@ -109,13 +120,14 @@ def _write_yaml(tmpdir, name, data):
     return path
 
 
-def _paths(tmpdir, targets=None, joint_limits=None, servo_map=None, gripper_profile=None, robot_config=None):
+def _paths(tmpdir, targets=None, joint_limits=None, servo_map=None, gripper_profile=None, robot_config=None, home_pose=None):
     return {
         "targets": _write_yaml(tmpdir, "square_targets.yaml", targets if targets is not None else _targets()),
         "joint_limits": _write_yaml(tmpdir, "joint_limits.yaml", joint_limits if joint_limits is not None else _joint_limits()),
         "servo_map": _write_yaml(tmpdir, "servo_map.yaml", servo_map if servo_map is not None else _servo_map()),
         "gripper_profile": _write_yaml(tmpdir, "gripper_profile.yaml", gripper_profile if gripper_profile is not None else _gripper_profile()),
         "robot_config": _write_yaml(tmpdir, "robot.yaml", robot_config if robot_config is not None else _robot_config()),
+        "home_pose": _write_yaml(tmpdir, "home_pose.yaml", home_pose if home_pose is not None else _home_pose()),
     }
 
 
@@ -130,6 +142,7 @@ def _make_args(tmpdir, paths=None, **overrides):
         "servo_map": paths["servo_map"],
         "gripper_profile": paths["gripper_profile"],
         "robot_config": paths["robot_config"],
+        "home_pose": paths["home_pose"],
         "real": False,
         "confirm_text": None,
         "pause_each": None,
@@ -143,6 +156,7 @@ def _make_args(tmpdir, paths=None, **overrides):
         "piece": "rook",
         "allow_same_square": False,
         "allow_place_uses_pick": False,
+        "return_home_after": False,
     }
     values.update(overrides)
     return type("Args", (object,), values)()
@@ -372,3 +386,52 @@ def test_generated_pick_or_place_pose_causes_refusal(tmpdir):
     args = _make_args(tmpdir, paths=paths)
     with pytest.raises(open_loop_pick_place.OpenLoopPickPlaceError):
         open_loop_pick_place.validate_inputs(args)
+
+
+def test_return_home_after_adds_final_home_stage(tmpdir):
+    args = _make_args(tmpdir, allow_same_square=True, return_home_after=True)
+    validation = open_loop_pick_place.validate_inputs(args)
+    validation["step_size_ticks"] = args.step_size_ticks
+    validation["gripper_step_size_ticks"] = args.gripper_step_size_ticks
+    stages = open_loop_pick_place.build_stage_sequence(validation, pause_each=False)
+    assert stages[-1]["name"] == "move_home_after_place"
+    assert stages[-1]["kind"] == "arm"
+    assert stages[-1]["target_pose_name"] == "home_pose"
+
+
+def test_home_pose_is_validated_before_motion(tmpdir):
+    bad_home = _home_pose(seed=5000)
+    paths = _paths(tmpdir, home_pose=bad_home)
+    args = _make_args(tmpdir, paths=paths, allow_same_square=True, return_home_after=True)
+    with pytest.raises(open_loop_pick_place.OpenLoopPickPlaceError) as excinfo:
+        open_loop_pick_place.validate_inputs(args)
+    assert "home_pose" in str(excinfo.value)
+
+
+def test_missing_home_pose_fails_clearly(tmpdir):
+    paths = _paths(tmpdir)
+    args = _make_args(
+        tmpdir,
+        paths=paths,
+        allow_same_square=True,
+        return_home_after=True,
+        home_pose=str(tmpdir.join("missing_home_pose.yaml")),
+    )
+    with pytest.raises(open_loop_pick_place.OpenLoopPickPlaceError) as excinfo:
+        open_loop_pick_place.validate_inputs(args)
+    assert "home pose file does not exist" in str(excinfo.value)
+
+
+def test_return_home_dry_run_does_not_touch_hardware(tmpdir):
+    args = _make_args(tmpdir, allow_same_square=True, return_home_after=True)
+    calls = {"count": 0}
+
+    def fake_bus_factory(**kwargs):
+        calls["count"] += 1
+        raise AssertionError("dry-run should not build a hardware bus")
+
+    exit_code, result = open_loop_pick_place.run(args, bus_factory=fake_bus_factory)
+    assert exit_code == 0
+    assert calls["count"] == 0
+    assert result["return_home_after"] is True
+    assert result["sequence_stages"][-1] == "move_home_after_place"

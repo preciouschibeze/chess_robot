@@ -14,7 +14,7 @@ gripper:
   direction_sign: -1
   movement_direction_note: "increasing ticks opens gripper; decreasing ticks closes gripper"
 
-  grasp_position: 1536
+  grasp_position: 1510
   pre_grasp_position: 1596
   neutral_position: 1616
   release_position: 1652

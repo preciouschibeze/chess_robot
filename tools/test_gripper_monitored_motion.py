@@ -107,6 +107,16 @@ def build_parser():
         default=DEFAULT_TARGET_TOLERANCE,
         help="Allowed final target error in raw ticks. Default: 3.",
     )
+    parser.add_argument(
+        "--require-initial-torque-disabled",
+        action="store_true",
+        help="Refuse real motion if ID 6 Torque_Enable is already 1 at startup.",
+    )
+    parser.add_argument(
+        "--disable-before-start",
+        action="store_true",
+        help="Disable and verify ID 6 torque before the normal real-motion confirmation flow.",
+    )
     return parser
 
 
@@ -255,6 +265,16 @@ def _read_required_register(bus, label, spec):
     return int(value)
 
 
+def _verify_torque_state(bus, write_step, intended_value):
+    readback_value = _read_required_register(
+        bus,
+        "{} torque enable readback".format(write_step),
+        REG_TORQUE_ENABLE,
+    )
+    readback_verified = int(readback_value) == int(intended_value)
+    return readback_value, readback_verified
+
+
 def _write_goal_with_readback(bus, write_step, intended_value, allow_verified_continue):
     intended_value = int(intended_value)
     _print_write_step(write_step, "Goal_Position", intended_value)
@@ -363,14 +383,28 @@ def _write_torque_with_readback(bus, write_step, enabled, allow_verified_continu
     _print_write_step(write_step, "Torque_Enable", intended_value)
     try:
         bus.torque_enable(GRIPPER_SERVO_ID, bool(enabled))
+        readback_value, readback_verified = _verify_torque_state(
+            bus, write_step, intended_value
+        )
         _log_write_result(
             bus, write_step, "Torque_Enable", intended_value,
             status_response_ok=True,
-            readback_verified=False,
-            readback_value=None,
+            readback_verified=readback_verified,
+            readback_value=readback_value,
             continued_after_missing_status=False,
+            status="ok" if readback_verified else "error",
         )
-        return False
+        if not readback_verified:
+            raise GripperMotionError(
+                "Refusing: {} Torque_Enable readback was {}, expected {}.".format(
+                    write_step, readback_value, intended_value
+                )
+            )
+        return {
+            "missing_status": False,
+            "readback_verified": True,
+            "readback_value": readback_value,
+        }
     except ServoBusError as exc:
         if not _is_missing_write_status(exc):
             _log_write_result(
@@ -397,7 +431,11 @@ def _write_torque_with_readback(bus, write_step, enabled, allow_verified_continu
         )
         if continued:
             print("write_status_missing_but_readback_verified")
-            return True
+            return {
+                "missing_status": True,
+                "readback_verified": True,
+                "readback_value": readback_value,
+            }
         raise GripperMotionError(
             "Refusing: {} write status was missing and Torque_Enable readback was {}.".format(
                 write_step, readback_value
@@ -440,6 +478,49 @@ def _align_final_goal_to_present_with_torque_disabled(bus):
     print("Final goal aligned to present with torque disabled: {}".format(final_present))
 
 
+def _handle_initial_torque_state(args, bus, registers):
+    torque = int(registers["torque"])
+    if torque == 1:
+        message = (
+            "WARNING: ID 6 Torque_Enable is already 1 at startup. "
+            "Another process may be holding the bus, or a previous command path left torque enabled."
+        )
+        print(message)
+        _log(bus, "initial_torque_enabled_warning", "warning", torque=torque)
+        if getattr(args, "require_initial_torque_disabled", False):
+            raise GripperMotionError(
+                "Refusing: initial Torque_Enable is 1 and --require-initial-torque-disabled is set."
+            )
+
+    if getattr(args, "disable_before_start", False):
+        if torque == 0:
+            readback_value, readback_verified = _verify_torque_state(
+                bus, "disable_before_start", 0
+            )
+            _log_write_result(
+                bus, "disable_before_start", "Torque_Enable", 0,
+                status_response_ok=True,
+                readback_verified=readback_verified,
+                readback_value=readback_value,
+                continued_after_missing_status=False,
+                status="skipped_already_disabled" if readback_verified else "error",
+            )
+            if not readback_verified:
+                raise GripperMotionError(
+                    "Refusing: disable_before_start expected Torque_Enable 0, read {}.".format(
+                        readback_value
+                    )
+                )
+            print("Initial torque already disabled and verified.")
+        else:
+            _write_torque_with_readback(
+                bus, "disable_before_start", False,
+                allow_verified_continue=True,
+            )
+            registers["torque"] = 0
+            print("Initial torque disabled and verified before start.")
+
+
 def _print_dry_run_plan(args, calibration, log_path):
     delta = int(args.delta)
     max_delta = int(args.max_delta)
@@ -478,7 +559,8 @@ def _print_dry_run_plan(args, calibration, log_path):
     print("  8. Require observed motion in the requested direction by at least {} ticks".format(min_observed_delta))
     print("  9. Require final within {} ticks of target or stopped near target".format(tolerance))
     print("  10. Disable torque for ID 6 after the test")
-    print("  11. With torque disabled, align final Goal_Position to final Present_Position")
+    print("  11. Verify ID 6 Torque_Enable readback is 0")
+    print("  12. With torque disabled, align final Goal_Position to final Present_Position")
     print("Write steps: align_goal_to_present, enable_torque, command_target, disable_torque, align_final_goal_to_present")
     print("Typed confirmation template: MOVE gripper <target>")
     print("No hardware writes performed.")
@@ -635,6 +717,8 @@ def _run_real(args, config, calibration):
         print("Tolerance: {}".format(tolerance))
         print("Target: {}".format(target))
 
+        _handle_initial_torque_state(args, bus, registers)
+
         if int(registers["goal"]) == int(registers["present"]):
             print("goal already aligned")
             _log(bus, "align_goal_to_present", "skipped", goal_position=registers["present"])
@@ -782,7 +866,26 @@ def _run_real(args, config, calibration):
                     allow_verified_continue=True,
                 )
                 torque_disabled = True
-                print("Torque disabled for ID 6.")
+                final_torque = _read_required_register(
+                    bus, "final torque state", REG_TORQUE_ENABLE
+                )
+                _log(
+                    bus,
+                    "final_torque_disable_verified",
+                    "ok" if int(final_torque) == 0 else "error",
+                    torque=final_torque,
+                )
+                print("Final Torque_Enable readback for ID 6: {}".format(final_torque))
+                if int(final_torque) != 0:
+                    print(
+                        "WARNING: final Torque_Enable is still enabled; another process or failed write may be re-enabling torque."
+                    )
+                    raise GripperMotionError(
+                        "Final torque disable did not verify: Torque_Enable readback is {}.".format(
+                            final_torque
+                        )
+                    )
+                print("Torque disabled for ID 6 and verified.")
             except Exception as exc:
                 _log_write_result(
                     bus, "disable_torque", "Torque_Enable", 0,
@@ -794,6 +897,7 @@ def _run_real(args, config, calibration):
                     error=str(exc),
                 )
                 print("WARNING: failed to disable torque for ID 6: {}".format(exc))
+                raise
         if torque_disabled:
             try:
                 _align_final_goal_to_present_with_torque_disabled(bus)

@@ -1,0 +1,2 @@
+profile_version,joint,sample_count,mean_abs_error_ticks,max_abs_error_ticks,first_timestamp,last_timestamp,note
+previous_profile,gripper,0,not evidenced,not evidenced,not evidenced,not evidenced,"No target/readback-linked old-profile motion trials found in servo.log, open_loop_pick_place.log, or movebook_physical_sequence.log; only calibration-save evidence exists."
